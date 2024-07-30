@@ -25,7 +25,6 @@ namespace NuGet.Tests.Apex.Daily
         {
         }
 
-        [Ignore]
         [TestMethod]
         [Timeout(DefaultTimeout)]
         public void InstallPackageToWebSiteProjectFromUI()
