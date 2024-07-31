@@ -42,10 +42,10 @@ namespace NuGet.Tests.Apex.Daily
             CommonUtility.OpenNuGetPackageManagerWithDte(VisualStudio, Logger);
             var nugetTestService = GetNuGetTestService();
             var uiwindow = nugetTestService.GetUIWindowfromProject(project);
-            uiwindow.InstallPackageFromUI("log4net", "2.0.12");
+            uiwindow.InstallPackageFromUI("log4net", "2.0.15");
 
             // Assert
-            CommonUtility.AssertPackageInPackagesConfig(VisualStudio, project, "log4net", "2.0.12", Logger);
+            CommonUtility.AssertPackageInPackagesConfig(VisualStudio, project, "log4net", "2.0.15", Logger);
         }
 
         [Ignore]
@@ -91,7 +91,7 @@ namespace NuGet.Tests.Apex.Daily
             CommonUtility.OpenNuGetPackageManagerWithDte(VisualStudio, Logger);
             var nugetTestService = GetNuGetTestService();
             var uiwindow = nugetTestService.GetUIWindowfromProject(project);
-            uiwindow.InstallPackageFromUI("log4net", "2.0.15");
+            uiwindow.InstallPackageFromUI("log4net", "2.0.12");
             VisualStudio.ClearWindows();
             uiwindow.UninstallPackageFromUI("log4net");
 
