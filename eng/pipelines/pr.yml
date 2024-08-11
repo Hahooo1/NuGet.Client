@@ -37,6 +37,7 @@ variables:
   SkipSigning: true
   CI: true
   Codeql.Enabled: false
+  RESTORE_ENABLE_NEW_RESOLVER: false
 
 trigger:
   branches:
