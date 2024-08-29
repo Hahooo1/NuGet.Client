@@ -27,7 +27,7 @@ namespace NuGet.Tests.Apex.Daily
 
         [TestMethod]
         [Timeout(DefaultTimeout)]
-        public void InstallPackageToWebSiteProjectFromUI()
+        public void InstallPackageToWebSiteProjectFromUIRenameForTest()
         {
             // Arrange
             EnsureVisualStudioHost();

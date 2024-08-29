@@ -715,6 +715,15 @@ namespace NuGet.PackageManagement.VisualStudio
             IVsSolutionManager? solutionManager = await _sharedState.SolutionManager.GetValueAsync(cancellationToken);
             Assumes.NotNull(solutionManager);
 
+            var nugetProjects = (await solutionManager.GetNuGetProjectsAsync());
+            var projectsById = nugetProjects.Select(x => x.GetMetadata<string>(NuGetProjectMetadataKeys.ProjectId)).GroupBy(x => x, StringComparer.OrdinalIgnoreCase);
+            if (projectsById.Any(x => x.Count() > 1))
+            {
+                var res = projectsById.Where(x => x.Count() > 1).SelectMany(x => x.Select(y => y));
+                throw new Exception($"ProjectIds Dupes: {string.Join(";", res)}");
+            }
+
+
             Dictionary<string, NuGetProject>? projects = (await solutionManager.GetNuGetProjectsAsync())
                 .ToDictionary(project => project.GetMetadata<string>(NuGetProjectMetadataKeys.ProjectId), _ => _, StringComparer.OrdinalIgnoreCase);
             var matchingProjects = new List<NuGetProject>(capacity: projectIds.Count);
