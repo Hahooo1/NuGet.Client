@@ -716,10 +716,10 @@ namespace NuGet.PackageManagement.VisualStudio
             Assumes.NotNull(solutionManager);
 
             var nugetProjects = (await solutionManager.GetNuGetProjectsAsync());
-            var projectsById = nugetProjects.Select(x => x.GetMetadata<string>(NuGetProjectMetadataKeys.ProjectId)).GroupBy(x => x, StringComparer.OrdinalIgnoreCase);
+            var projectsById = nugetProjects.GroupBy(x => x.GetMetadata<string>(NuGetProjectMetadataKeys.ProjectId), StringComparer.OrdinalIgnoreCase);
             if (projectsById.Any(x => x.Count() > 1))
             {
-                var res = projectsById.Where(x => x.Count() > 1).SelectMany(x => x.Select(y => y));
+                var res = projectsById.Where(x => x.Count() > 1).SelectMany(x => x.Select(y => y.GetMetadata<string>(NuGetProjectMetadataKeys.FullPath)));
                 throw new Exception($"ProjectIds Dupes: {string.Join(";", res)}");
             }
 
