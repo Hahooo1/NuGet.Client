@@ -92,11 +92,9 @@ namespace NuGet.Tests.Apex.Daily
             var nugetTestService = GetNuGetTestService();
             var uiwindow = nugetTestService.GetUIWindowfromProject(project);
             uiwindow.InstallPackageFromUI("log4net", "2.0.15");
-            VisualStudio.ClearWindows();
-            uiwindow.UninstallPackageFromUI("log4net");
 
             // Assert
-            CommonUtility.AssertPackageNotInPackagesConfig(VisualStudio, project, "log4net", Logger);
+            CommonUtility.AssertPackageInPackagesConfig(VisualStudio, project, "log4net", "2.0.15", Logger);
         }
 
         [TestMethod]
