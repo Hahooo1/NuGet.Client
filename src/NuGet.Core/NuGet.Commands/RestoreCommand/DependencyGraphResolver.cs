@@ -69,7 +69,7 @@ namespace NuGet.Commands
             var runtimeGraphs = new List<RestoreTargetGraph>();
             var graphByTFM = new Dictionary<NuGetFramework, RestoreTargetGraph>();
             var runtimeIds = RequestRuntimeUtility.GetRestoreRuntimes(_request);
-            IEnumerable<FrameworkRuntimePair> projectFrameworkRuntimePairs = RestoreCommand.CreateFrameworkRuntimePairs(_request.Project, runtimeIds);
+            List<FrameworkRuntimePair> projectFrameworkRuntimePairs = RestoreCommand.CreateFrameworkRuntimePairs(_request.Project, runtimeIds);
             RuntimeGraph allRuntimes = RuntimeGraph.Empty;
 
             LibraryRangeInterningTable libraryRangeInterningTable = new LibraryRangeInterningTable();
@@ -80,7 +80,9 @@ namespace NuGet.Commands
             bool hasInstallBeenCalledAlready = false;
             DownloadDependencyResolutionResult[]? downloadDependencyResolutionResults = default;
 
-            foreach (var pair in projectFrameworkRuntimePairs)
+            HashSet<NuGetFramework> resolvedRuntimeGraphs = new HashSet<NuGetFramework>();
+
+            foreach (FrameworkRuntimePair pair in projectFrameworkRuntimePairs.NoAllocEnumerate())
             {
                 if (!string.IsNullOrWhiteSpace(pair.RuntimeIdentifier) && !hasInstallBeenCalledAlready)
                 {
@@ -100,7 +102,7 @@ namespace NuGet.Commands
                 var resolvedDependencies = new HashSet<ResolvedDependencyKey>();
 
                 RuntimeGraph? runtimeGraph = default;
-                if (!string.IsNullOrEmpty(pair.RuntimeIdentifier) && graphByTFM.TryGetValue(pair.Framework, out var tfmNonRidGraph))
+                if (!string.IsNullOrEmpty(pair.RuntimeIdentifier) && resolvedRuntimeGraphs.Add(pair.Framework) && graphByTFM.TryGetValue(pair.Framework, out var tfmNonRidGraph))
                 {
                     // We start with the non-RID TFM graph.
                     // This is guaranteed to be computed before any graph with a RID, so we can assume this will return a value.
