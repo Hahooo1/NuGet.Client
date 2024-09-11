@@ -215,6 +215,13 @@ namespace NuGet.Commands
 
                     FindLibraryEntryResult refItemResult = await refItemTask;
 
+                    // If the package came from a remote library provider, it needs to be installed locally.
+                    var isRemote = context.RemoteLibraryProviders.Contains(refItemResult.Item.Data.Match.Provider);
+                    if (isRemote)
+                    {
+                        packagesToInstall.Add(refItemResult.Item.Data.Match);
+                    }
+
                     LibraryDependencyTarget typeConstraint = currentRef.LibraryRange.TypeConstraint;
                     if (evictions.TryGetValue(currentRefRangeIndex, out var eviction))
                     {
@@ -271,6 +278,12 @@ namespace NuGet.Commands
                                 },
                                 (libraryDependency: currentRef, dependencyIndex: currentRefDependencyIndex, rangeIndex: currentRefRangeIndex, pair.Framework, context, libraryDependencyInterningTable, libraryRangeInterningTable, token),
                                 token);
+
+                            // If the package came from a remote library provider, it needs to be installed locally.
+                            if (context.RemoteLibraryProviders.Contains(refItemResult.Item.Data.Match.Provider))
+                            {
+                                packagesToInstall.Add(refItemResult.Item.Data.Match);
+                            }
                         }
                     }
 
@@ -381,6 +394,11 @@ namespace NuGet.Commands
                                     },
                                     (libraryDependency: currentRef, dependencyIndex: currentRefDependencyIndex, rangeIndex: currentRefRangeIndex, pair.Framework, context, libraryDependencyInterningTable, libraryRangeInterningTable, token),
                                     token);
+
+                                if (context.RemoteLibraryProviders.Contains(refItemResult.Item.Data.Match.Provider))
+                                {
+                                    packagesToInstall.Add(refItemResult.Item.Data.Match);
+                                }
                             }
 
                             int deepEvictions = 0;
@@ -472,6 +490,39 @@ namespace NuGet.Commands
                                 }
 
                                 chosenResolvedItem.ParentPathsThatHaveBeenEclipsed.Add(pathToCurrentRef[pathToCurrentRef.Length - 1]);
+                            }
+
+                            if (!directPackageReferenceFromRootProject)
+                            {
+                                for (int i = 0; i < refItemResult.Item.Data.Dependencies.Count; i++)
+                                {
+                                    LibraryDependency dep = refItemResult.Item.Data.Dependencies[i];
+
+                                    var rangeIndex = refItemResult.GetRangeIndexForDependency(i);
+                                    var depIndex = refItemResult.GetDependencyIndexForDependency(i);
+
+                                    var result = await findLibraryEntryCache.GetOrAddAsync(
+                                        rangeIndex,
+                                        async static state =>
+                                        {
+                                            return await FindLibraryEntryResult.CreateAsync(
+                                                state.libraryDependency,
+                                                state.dependencyIndex,
+                                                state.rangeIndex,
+                                                state.Framework,
+                                                state.context,
+                                                state.libraryDependencyInterningTable,
+                                                state.libraryRangeInterningTable,
+                                                state.token);
+                                        },
+                                        (libraryDependency: dep, dependencyIndex: depIndex, rangeIndex, pair.Framework, context, libraryDependencyInterningTable, libraryRangeInterningTable, token),
+                                        token);
+
+                                    if (context.RemoteLibraryProviders.Contains(result.Item.Data.Match.Provider))
+                                    {
+                                        packagesToInstall.Add(result.Item.Data.Match);
+                                    }
+                                }
                             }
 
                             continue;
@@ -613,13 +664,6 @@ namespace NuGet.Commands
                                     }
                                 }
                             });
-                    }
-
-                    // If the package came from a remote library provider, it needs to be installed locally.
-                    var isRemote = context.RemoteLibraryProviders.Contains(refItemResult.Item.Data.Match.Provider);
-                    if (isRemote)
-                    {
-                        packagesToInstall.Add(refItemResult.Item.Data.Match);
                     }
 
                     HashSet<LibraryDependencyIndex>? suppressions = default;
