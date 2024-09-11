@@ -25,29 +25,6 @@ namespace NuGet.Tests.Apex.Daily
         {
         }
 
-        [TestMethod]
-        [Timeout(DefaultTimeout)]
-        public void InstallPackageToWebSiteProjectFromUI()
-        {
-            // Arrange
-            EnsureVisualStudioHost();
-            var dte = VisualStudio.Dte;
-            var solutionService = VisualStudio.Get<SolutionService>();
-            solutionService.CreateEmptySolution();
-            var project = solutionService.AddProject(ProjectLanguage.CSharp, ProjectTemplate.WebSiteEmpty, ProjectTargetFramework.V48, "WebSiteEmptyInstall");
-            VisualStudio.ClearOutputWindow();
-            solutionService.SaveAll();
-
-            // Act
-            CommonUtility.OpenNuGetPackageManagerWithDte(VisualStudio, Logger);
-            var nugetTestService = GetNuGetTestService();
-            var uiwindow = nugetTestService.GetUIWindowfromProject(project);
-            uiwindow.InstallPackageFromUI("log4net", "2.0.15");
-
-            // Assert
-            CommonUtility.AssertPackageInPackagesConfig(VisualStudio, project, "log4net", "2.0.15", Logger);
-        }
-
         [Ignore]
         [TestMethod]
         [Timeout(DefaultTimeout)]
@@ -97,6 +74,29 @@ namespace NuGet.Tests.Apex.Daily
 
             // Assert
             CommonUtility.AssertPackageNotInPackagesConfig(VisualStudio, project, "log4net", Logger);
+        }
+
+        [TestMethod]
+        [Timeout(DefaultTimeout)]
+        public void InstallPackageToWebSiteProjectFromUI()
+        {
+            // Arrange
+            EnsureVisualStudioHost();
+            var dte = VisualStudio.Dte;
+            var solutionService = VisualStudio.Get<SolutionService>();
+            solutionService.CreateEmptySolution();
+            var project = solutionService.AddProject(ProjectLanguage.CSharp, ProjectTemplate.WebSiteEmpty, ProjectTargetFramework.V48, "WebSiteEmpty");
+            VisualStudio.ClearOutputWindow();
+            solutionService.SaveAll();
+
+            // Act
+            CommonUtility.OpenNuGetPackageManagerWithDte(VisualStudio, Logger);
+            var nugetTestService = GetNuGetTestService();
+            var uiwindow = nugetTestService.GetUIWindowfromProject(project);
+            uiwindow.InstallPackageFromUI("log4net", "2.0.15");
+
+            // Assert
+            CommonUtility.AssertPackageInPackagesConfig(VisualStudio, project, "log4net", "2.0.15", Logger);
         }
 
         [TestMethod]
