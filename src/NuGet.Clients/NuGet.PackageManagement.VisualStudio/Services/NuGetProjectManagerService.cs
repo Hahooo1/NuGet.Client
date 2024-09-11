@@ -720,7 +720,7 @@ namespace NuGet.PackageManagement.VisualStudio
             if (projectsById.Any(x => x.Count() > 1))
             {
                 var res = projectsById.Where(x => x.Count() > 1).SelectMany(x => x.Select(y => y.GetMetadata<string>(NuGetProjectMetadataKeys.FullPath)));
-                throw new Exception($"Project Count: {nugetProjects.Count()}; ProjectIds Dupes: {string.Join(";", res)}");
+                throw new Exception($"ProjectIds Dupes: {string.Join(";", res)}");
             }
 
 
