@@ -1,8 +1,6 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
-#if IS_SIGNING_SUPPORTED
-
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -10,6 +8,7 @@ using System.Linq;
 using System.Security.Cryptography.X509Certificates;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Internal.NuGet.Testing.SignedPackages;
 using NuGet.Packaging.Signing;
 using NuGet.Test.Utility;
 using Test.Utility.Signing;
@@ -21,7 +20,9 @@ namespace NuGet.Packaging.FuncTest.SigningTests
     public class SignatureUtilityTests
     {
         private readonly SigningTestFixture _fixture;
+#if IS_DESKTOP
         private const int SHA1HashLength = 20;
+#endif
 
         public SignatureUtilityTests(SigningTestFixture fixture)
         {
@@ -243,4 +244,3 @@ namespace NuGet.Packaging.FuncTest.SigningTests
         }
     }
 }
-#endif

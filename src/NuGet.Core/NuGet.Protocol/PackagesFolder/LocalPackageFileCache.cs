@@ -4,6 +4,7 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.IO;
 using System.Linq;
 using NuGet.Common;
@@ -42,10 +43,6 @@ namespace NuGet.Protocol
         // Metadata file
         private readonly ConcurrentDictionary<string, bool> _metadataFileCache
             = new ConcurrentDictionary<string, bool>(PathUtility.GetStringComparerBasedOnOS());
-
-        public LocalPackageFileCache()
-        {
-        }
 
         /// <summary>
         /// Read a nuspec file from disk. The nuspec is expected to exist.
@@ -142,8 +139,7 @@ namespace NuGet.Protocol
                 // This is sorted before it is written out
                 return packageReader.GetFiles()
                     .Where(file => IsAllowedLibraryFile(file))
-                    .ToList()
-                    .AsReadOnly();
+                    .ToImmutableArray();
             }
         }
 

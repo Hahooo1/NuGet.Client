@@ -40,8 +40,8 @@
     VisibilityIfFalse="Visible" />
   <vsui:BooleanToHiddenVisibilityConverter
     x:Key="BooleanToHiddenVisibilityConverter" />
-  <nuget:DownloadCountToVisibilityConverter
-    x:Key="DownloadCountToVisibilityConverter" />
+  <nuget:GreaterThanThresholdToVisibilityConverter
+    x:Key="GreaterThanThresholdToVisibilityConverter" />
   <nuget:FontSizeConverter
     Scale="122"
     x:Key="Font122PercentSizeConverter" />
@@ -167,17 +167,11 @@
     <Setter Property="FocusVisualStyle" Value="{StaticResource GridSplitterFocusVisualStyle}"/>
   </Style>
 
-  <Style x:Key="{x:Type ComboBox}" TargetType="{x:Type ComboBox}" BasedOn="{StaticResource {x:Static vs:VsResourceKeys.ComboBoxStyleKey}}">
-    <Setter Property="FocusVisualStyle" Value="{StaticResource ControlsFocusVisualStyle}"/>
-  </Style>
-
-  <Style x:Key="{x:Type ComboBoxItem}" TargetType="{x:Type ComboBoxItem}" BasedOn="{StaticResource {x:Static vs:VsResourceKeys.ComboBoxItemStyleKey}}">
-    <Setter Property="FocusVisualStyle" Value="{StaticResource ControlsFocusVisualStyle}"/>
-  </Style>
-
   <Style x:Key="{x:Type ScrollBar}" TargetType="{x:Type ScrollBar}" BasedOn="{StaticResource {x:Static vs:VsResourceKeys.ScrollBarStyleKey}}"/>
 
   <Style x:Key="{x:Type ScrollViewer}" TargetType="{x:Type ScrollViewer}" BasedOn="{StaticResource {x:Static vs:VsResourceKeys.ScrollViewerStyleKey}}"/>
+
+  <Style x:Key="{x:Type ProgressBar}" TargetType="{x:Type ProgressBar}" BasedOn="{StaticResource {x:Static vs:VsResourceKeys.ProgressBarStyleKey}}"/>
 
   <Style x:Key="TooltipStyle" TargetType="{x:Type TextBlock}">
     <Setter Property="TextWrapping" Value="Wrap" />

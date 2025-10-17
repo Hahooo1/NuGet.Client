@@ -23,8 +23,6 @@ namespace NuGet.Commands
 
         public string GlobalPackagesFolder { get; set; }
 
-        public bool? IsLowercaseGlobalPackagesFolder { get; set; }
-
         public bool DisableParallel { get; set; }
 
         public bool AllowNoOp { get; set; }
@@ -52,8 +50,6 @@ namespace NuGet.Commands
         public List<IPreLoadedRestoreRequestProvider> PreLoadedRequestProviders { get; set; } = new List<IPreLoadedRestoreRequestProvider>();
 
         public PackageSaveMode PackageSaveMode { get; set; } = PackageSaveMode.Defaultv3;
-
-        public int? LockFileVersion { get; set; }
 
         public bool? ValidateRuntimeAssets { get; set; }
 
@@ -186,9 +182,7 @@ namespace NuGet.Commands
 
         public void ApplyStandardProperties(RestoreRequest request)
         {
-            if (request.ProjectStyle == ProjectStyle.PackageReference
-                || request.ProjectStyle == ProjectStyle.DotnetToolReference
-                || request.ProjectStyle == ProjectStyle.Standalone)
+            if (request.ProjectStyle == ProjectStyle.PackageReference)
             {
                 request.LockFilePath = Path.Combine(request.RestoreOutputPath, LockFileFormat.AssetsFileName);
             }
@@ -207,16 +201,7 @@ namespace NuGet.Commands
 
             request.RequestedRuntimes.UnionWith(Runtimes);
             request.FallbackRuntimes.UnionWith(FallbackRuntimes);
-
-            if (IsLowercaseGlobalPackagesFolder.HasValue)
-            {
-                request.IsLowercasePackagesDirectory = IsLowercaseGlobalPackagesFolder.Value;
-            }
-
-            if (LockFileVersion.HasValue && LockFileVersion.Value > 0)
-            {
-                request.LockFileVersion = LockFileVersion.Value;
-            }
+            request.LockFileVersion = LockFileFormat.Version;
 
             // Run runtime asset checks for project.json, and for other types if enabled.
             if (ValidateRuntimeAssets == null)

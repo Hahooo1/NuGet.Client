@@ -336,7 +336,7 @@ namespace NuGet.PackageManagement.Test.NuGetPackageManagerTests
         {
             // Arrange
             var sourceRepositoryProvider = TestSourceRepositoryUtility.CreateV3OnlySourceRepositoryProvider();
-            using (var testSolutionManager = new TestSolutionManager())
+            using (var testSolutionManager = new TestVSSolutionManager())
             {
                 var testSettings = NullSettings.Instance;
                 var token = CancellationToken.None;
@@ -386,13 +386,13 @@ namespace NuGet.PackageManagement.Test.NuGetPackageManagerTests
             }
         }
 
-        [Fact]
+        [Fact(Skip = "https://github.com/NuGet/Home/issues/10212")]
         public async Task ExecuteNuGetProjectActionsAsync_MixedProjects()
         {
             // Arrange
             var sourceRepositoryProvider = TestSourceRepositoryUtility.CreateV3OnlySourceRepositoryProvider();
             using (var settingsdir = TestDirectory.Create())
-            using (var testSolutionManager = new TestSolutionManager())
+            using (var testSolutionManager = new TestVSSolutionManager())
             {
                 var Settings = new Settings(settingsdir);
                 foreach (var source in sourceRepositoryProvider.GetRepositories())

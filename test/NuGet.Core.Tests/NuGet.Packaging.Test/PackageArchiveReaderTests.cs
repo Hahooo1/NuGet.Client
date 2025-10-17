@@ -5,11 +5,10 @@ using System;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
-#if IS_SIGNING_SUPPORTED
 using System.Text;
-#endif
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Internal.NuGet.Testing.SignedPackages;
 using Moq;
 using NuGet.Common;
 using NuGet.Frameworks;
@@ -17,9 +16,7 @@ using NuGet.Packaging.Core;
 using NuGet.Packaging.Signing;
 using NuGet.Test.Utility;
 using NuGet.Versioning;
-#if IS_SIGNING_SUPPORTED
 using Test.Utility.Signing;
-#endif
 using Xunit;
 
 namespace NuGet.Packaging.Test
@@ -101,7 +98,7 @@ namespace NuGet.Packaging.Test
                 {
                     var groups = reader.GetReferenceItems().ToArray();
 
-                    Assert.Equal(4, groups.Count());
+                    Assert.Equal(4, groups.Length);
 
                     Assert.Equal(NuGetFramework.AnyFramework, groups[0].TargetFramework);
                     Assert.Equal("lib/a.dll", groups[0].Items.ToArray()[0]);
@@ -130,7 +127,7 @@ namespace NuGet.Packaging.Test
                 {
                     var groups = reader.GetReferenceItems().ToArray();
 
-                    Assert.Equal(3, groups.Count());
+                    Assert.Equal(3, groups.Length);
 
                     Assert.Equal(NuGetFramework.AnyFramework, groups[0].TargetFramework);
                     Assert.Equal(2, groups[0].Items.Count());
@@ -160,7 +157,7 @@ namespace NuGet.Packaging.Test
                 {
                     var groups = reader.GetReferenceItems().ToArray();
 
-                    var emptyGroup = groups.Where(g => g.TargetFramework == NuGetFramework.ParseFolder("net45")).Single();
+                    var emptyGroup = groups.Single(g => g.TargetFramework == NuGetFramework.ParseFolder("net45"));
 
                     Assert.Equal(0, emptyGroup.Items.Count());
                 }
@@ -178,7 +175,7 @@ namespace NuGet.Packaging.Test
                 {
                     var groups = reader.GetReferenceItems().ToArray();
 
-                    Assert.Equal(1, groups.Count());
+                    Assert.Equal(1, groups.Length);
 
                     Assert.Equal(NuGetFramework.Parse("net40"), groups[0].TargetFramework);
                     Assert.Equal(2, groups[0].Items.Count());
@@ -218,7 +215,7 @@ namespace NuGet.Packaging.Test
                 {
                     var groups = reader.GetContentItems().ToArray();
 
-                    Assert.Equal(3, groups.Count());
+                    Assert.Equal(3, groups.Length);
                 }
             }
         }
@@ -234,7 +231,7 @@ namespace NuGet.Packaging.Test
                 {
                     var groups = reader.GetContentItems().ToArray();
 
-                    Assert.Equal(3, groups.Count());
+                    Assert.Equal(3, groups.Length);
                 }
             }
         }
@@ -250,7 +247,7 @@ namespace NuGet.Packaging.Test
                 {
                     var groups = reader.GetContentItems().ToArray();
 
-                    Assert.Equal(1, groups.Count());
+                    Assert.Equal(1, groups.Length);
 
                     Assert.Equal(NuGetFramework.AnyFramework, groups.Single().TargetFramework);
 
@@ -271,7 +268,7 @@ namespace NuGet.Packaging.Test
                 {
                     var groups = reader.GetReferenceItems().ToArray();
 
-                    Assert.Equal(3, groups.Count());
+                    Assert.Equal(3, groups.Length);
 
                     Assert.Equal(4, groups.SelectMany(e => e.Items).Count());
                 }
@@ -290,7 +287,7 @@ namespace NuGet.Packaging.Test
                 {
                     var groups = reader.GetReferenceItems().ToArray();
 
-                    Assert.Equal(2, groups.Count());
+                    Assert.Equal(2, groups.Length);
 
                     Assert.Equal(NuGetFramework.AnyFramework, groups[0].TargetFramework);
                     Assert.Equal(1, groups[0].Items.Count());
@@ -315,7 +312,7 @@ namespace NuGet.Packaging.Test
                 {
                     var groups = reader.GetReferenceItems().ToArray();
 
-                    Assert.Equal(3, groups.Count());
+                    Assert.Equal(3, groups.Length);
 
                     Assert.Equal(NuGetFramework.AnyFramework, groups[0].TargetFramework);
                     Assert.Equal(1, groups[0].Items.Count());
@@ -1026,7 +1023,7 @@ namespace NuGet.Packaging.Test
                     using (var packageStream = File.OpenRead(packageFileInfo.FullName))
                     using (var packageReader = new PackageArchiveReader(packageStream))
                     {
-                        // Act & Assert                         
+                        // Act & Assert
                         var files = await packageReader.CopyFilesAsync(
                             destination.Path.ToUpper(),
                             new[] { @"readme~.txt" },
@@ -1628,10 +1625,8 @@ namespace NuGet.Packaging.Test
 
                 // Assert is just that no exception was thrown.
             }
-
         }
 
-#if IS_SIGNING_SUPPORTED
         [Fact]
         public async Task ValidateIntegrityAsync_WhenSignatureContentNull_Throws()
         {
@@ -1869,7 +1864,6 @@ namespace NuGet.Packaging.Test
             }
         }
 
-#if IS_SIGNING_SUPPORTED
         [CIOnlyFact]
         public async Task GetContentHash_IsSameForUnsignedAndSignedPackageAsync()
         {
@@ -1911,7 +1905,6 @@ namespace NuGet.Packaging.Test
                 }
             }
         }
-#endif 
 
         private static Zip CreateZipWithNestedStoredZipArchives()
         {
@@ -1978,7 +1971,6 @@ namespace NuGet.Packaging.Test
                 return stream.ToArray();
             }
         }
-#endif
 
         [Fact]
         public void CanVerifySignedPackages_Always_ReturnsValueBasedOnOperatingSystemAndFramework()
@@ -2027,13 +2019,8 @@ namespace NuGet.Packaging.Test
                 bool result = packageArchiveReader.CanVerifySignedPackages(null);
 
                 // Assert
-#if IS_SIGNING_SUPPORTED
                 // Verify package signature when signing is supported
                 Assert.True(result);
-#else
-                // Cannot verify package signature when signing is not supported
-                Assert.False(result);
-#endif
             }
         }
 
@@ -2072,13 +2059,8 @@ namespace NuGet.Packaging.Test
                 // Act
                 bool result = packageArchiveReader.CanVerifySignedPackages(null);
                 // Assert
-#if IS_SIGNING_SUPPORTED
                 // Verify package signature when signing is supported
                 Assert.True(result);
-#else
-                // Cannot verify package signature when signing is not supported
-                Assert.False(result);
-#endif
             }
         }
 
@@ -2106,13 +2088,8 @@ namespace NuGet.Packaging.Test
 
         private static bool CanVerifySignedPackages(IEnvironmentVariableReader environmentVariableReader = null)
         {
-            return (RuntimeEnvironmentHelper.IsWindows ||
-                IsVerificationEnabledByEnvironmentVariable(environmentVariableReader)) &&
-#if IS_SIGNING_SUPPORTED
-                true;
-#else
-                false;
-#endif
+            return RuntimeEnvironmentHelper.IsWindows ||
+                IsVerificationEnabledByEnvironmentVariable(environmentVariableReader);
         }
 
         private static bool IsVerificationEnabledByEnvironmentVariable(

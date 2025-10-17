@@ -47,7 +47,7 @@ namespace NuGet.Packaging.Test
             </package>
             ".Trim();
             XDocument xml = XDocument.Parse(xmlString);
-            XElement metadataNode = xml.Root.Elements().Where(e => StringComparer.Ordinal.Equals(e.Name.LocalName, "metadata")).FirstOrDefault();
+            XElement metadataNode = xml.Root.Elements().FirstOrDefault(e => StringComparer.Ordinal.Equals(e.Name.LocalName, "metadata"));
             var results = new List<PackagingLogMessage>(InvalidUndottedFrameworkRule.ValidateDependencyGroups(metadataNode));
             if (shouldWarn)
             {
@@ -84,7 +84,7 @@ namespace NuGet.Packaging.Test
             </package>
             ".Trim();
             XDocument xml = XDocument.Parse(xmlString);
-            XElement metadataNode = xml.Root.Elements().Where(e => StringComparer.Ordinal.Equals(e.Name.LocalName, "metadata")).FirstOrDefault();
+            XElement metadataNode = xml.Root.Elements().FirstOrDefault(e => StringComparer.Ordinal.Equals(e.Name.LocalName, "metadata"));
             var results = new List<PackagingLogMessage>(InvalidUndottedFrameworkRule.ValidateReferenceGroups(metadataNode));
             if (shouldWarn)
             {
@@ -120,7 +120,7 @@ namespace NuGet.Packaging.Test
             </package>
             ".Trim();
             XDocument xml = XDocument.Parse(xmlString);
-            XElement metadataNode = xml.Root.Elements().Where(e => StringComparer.Ordinal.Equals(e.Name.LocalName, "metadata")).FirstOrDefault();
+            XElement metadataNode = xml.Root.Elements().FirstOrDefault(e => StringComparer.Ordinal.Equals(e.Name.LocalName, "metadata"));
             var results = new List<PackagingLogMessage>(InvalidUndottedFrameworkRule.ValidateFrameworkAssemblies(xml, metadataNode));
             if (shouldWarn)
             {
@@ -146,7 +146,7 @@ namespace NuGet.Packaging.Test
 
             };
             var results = new List<PackagingLogMessage>(InvalidUndottedFrameworkRule.ValidateFiles(files));
-            Assert.Equal(1, results.Count());
+            Assert.Equal(1, results.Count);
             Assert.Equal(NuGetLogCode.NU5501, results[0].Code);
             Assert.True(results[0].Message.Contains("contentFiles/any/net50/b.csv"));
             Assert.True(results[0].Message.Contains("lib/net50-windows7.0/d.dll"));

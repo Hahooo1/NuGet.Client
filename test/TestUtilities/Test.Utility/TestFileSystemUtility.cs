@@ -130,7 +130,7 @@ namespace NuGet.Test.Utility
                     return dotnetCli;
                 }
 
-                dotnetCli = Path.Combine(dir.FullName, dir.FullName, DotnetCliBinary);
+                dotnetCli = Path.Combine(dir.FullName, DotnetCliBinary);
                 if (File.Exists(dotnetCli))
                 {
                     return dotnetCli;
@@ -193,27 +193,6 @@ namespace NuGet.Test.Utility
             {
                 throw new InvalidOperationException("Trying to delete the root test folder in a test");
             }
-        }
-
-        private class ResetDirectory : IDisposable
-        {
-            public string OldPath { get; set; }
-
-            void IDisposable.Dispose()
-            {
-                Directory.SetCurrentDirectory(OldPath);
-            }
-        }
-
-        public static IDisposable SetCurrentDirectory(string path)
-        {
-            var oldPath = Directory.GetCurrentDirectory();
-            Directory.SetCurrentDirectory(path);
-
-            return new ResetDirectory()
-            {
-                OldPath = oldPath
-            };
         }
 
         public static DirectoryInfo GetDirectoryOfPathAbove(string relativePath)

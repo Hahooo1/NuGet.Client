@@ -19,6 +19,17 @@ namespace NuGet.CommandLine.XPlat
             VerbosityLevel = logLevel;
         }
 
+        /// <summary>
+        /// Create a CommandOutputLogger for commands invoked by the .NET CLI
+        /// </summary>
+        /// <returns></returns>
+        public static CommandOutputLogger Create()
+        {
+            var logger = new CommandOutputLogger(LogLevel.Information);
+            logger.HidePrefixForInfoAndMinimal = true;
+            return logger;
+        }
+
         public override void LogDebug(string data)
         {
             LogInternal(LogLevel.Debug, data);
@@ -129,6 +140,14 @@ namespace NuGet.CommandLine.XPlat
         }
 
         public virtual void LogMinimal(string data, ConsoleColor color)
+        {
+            var currentColor = Console.ForegroundColor;
+            Console.ForegroundColor = color;
+            LogInternal(LogLevel.Minimal, data);
+            Console.ForegroundColor = currentColor;
+        }
+
+        public void LogInline(string data, ConsoleColor color)
         {
             var currentColor = Console.ForegroundColor;
             Console.ForegroundColor = color;

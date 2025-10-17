@@ -4,11 +4,15 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Collections.Immutable;
+using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
 using FluentAssertions;
+using Microsoft.Internal.NuGet.Testing.SignedPackages;
 using Moq;
 using NuGet.Common;
 using NuGet.Configuration;
@@ -27,9 +31,6 @@ using NuGet.Versioning;
 using Test.Utility;
 using Test.Utility.Commands;
 using Test.Utility.ProjectManagement;
-#if IS_SIGNING_SUPPORTED
-using Test.Utility.Signing;
-#endif
 using Xunit;
 
 namespace NuGet.Commands.Test.RestoreCommandTests
@@ -78,7 +79,7 @@ namespace NuGet.Commands.Test.RestoreCommandTests
                 File.WriteAllText(Path.Combine(project1.FullName, "project.json"), project1Json);
 
                 var specPath1 = Path.Combine(project1.FullName, "project.json");
-                var spec1 = JsonPackageSpecReader.GetPackageSpec(project1Json, "project1", specPath1).EnsureProjectJsonRestoreMetadata();
+                var spec1 = JsonPackageSpecReader.GetPackageSpec(project1Json, "project1", specPath1).WithTestRestoreMetadata();
 
                 var logger = new TestLogger();
                 var request = new TestRestoreRequest(spec1, sources, packagesDir.FullName, logger)
@@ -147,7 +148,7 @@ namespace NuGet.Commands.Test.RestoreCommandTests
                 File.WriteAllText(Path.Combine(project1.FullName, "project.json"), project1Json);
 
                 var specPath1 = Path.Combine(project1.FullName, "project.json");
-                var spec1 = JsonPackageSpecReader.GetPackageSpec(project1Json, "project1", specPath1).EnsureProjectJsonRestoreMetadata();
+                var spec1 = JsonPackageSpecReader.GetPackageSpec(project1Json, "project1", specPath1).WithTestRestoreMetadata();
 
                 var logger = new TestLogger();
                 var request = new TestRestoreRequest(spec1, sources, packagesDir.FullName, logger)
@@ -217,7 +218,7 @@ namespace NuGet.Commands.Test.RestoreCommandTests
                 File.WriteAllText(Path.Combine(project1.FullName, "project.json"), project1Json);
 
                 var specPath1 = Path.Combine(project1.FullName, "project.json");
-                var spec1 = JsonPackageSpecReader.GetPackageSpec(project1Json, "project1", specPath1).EnsureProjectJsonRestoreMetadata();
+                var spec1 = JsonPackageSpecReader.GetPackageSpec(project1Json, "project1", specPath1).WithTestRestoreMetadata();
 
                 var logger = new TestLogger();
                 var request = new TestRestoreRequest(spec1, sources, packagesDir.FullName, logger)
@@ -287,7 +288,7 @@ namespace NuGet.Commands.Test.RestoreCommandTests
                 File.WriteAllText(Path.Combine(projectDir.FullName, "project.json"), projectJson);
 
                 var specPath = Path.Combine(projectDir.FullName, "project.json");
-                var spec = JsonPackageSpecReader.GetPackageSpec(projectJson, "project1", specPath).EnsureProjectJsonRestoreMetadata();
+                var spec = JsonPackageSpecReader.GetPackageSpec(projectJson, "project1", specPath).WithTestRestoreMetadata();
 
                 var logger = new TestLogger();
                 var request = new TestRestoreRequest(
@@ -365,7 +366,7 @@ namespace NuGet.Commands.Test.RestoreCommandTests
                 File.WriteAllText(Path.Combine(projectDir.FullName, "project.json"), projectJson);
 
                 var specPath = Path.Combine(projectDir.FullName, "project.json");
-                var spec = JsonPackageSpecReader.GetPackageSpec(projectJson, "project1", specPath).EnsureProjectJsonRestoreMetadata();
+                var spec = JsonPackageSpecReader.GetPackageSpec(projectJson, "project1", specPath).WithTestRestoreMetadata();
 
                 var logger = new TestLogger();
                 var lockFilePath = Path.Combine(projectDir.FullName, "project.lock.json");
@@ -452,6 +453,47 @@ namespace NuGet.Commands.Test.RestoreCommandTests
         }
 
         [Fact]
+        public async Task RestoreCommand_ProjectJsonProjectType_LogsNU1016ErrorAsync()
+        {
+            // Arrange
+
+            // An empty JSON object is used because only the file existing matters, not the JSON content.
+            var project1Json = @"
+            {
+            }";
+
+            using SimpleTestPathContext pathContext = new SimpleTestPathContext();
+            string projectName = "project1";
+
+            var projectPath = Path.Combine(pathContext.SolutionRoot, projectName);
+            Directory.CreateDirectory(projectPath);
+            var projectJsonPath = Path.Combine(projectPath, "project.json");
+            File.WriteAllText(projectJsonPath, project1Json);
+
+            var spec1 = JsonPackageSpecReader.GetPackageSpec(project1Json, projectName, projectJsonPath).WithTestRestoreMetadata();
+            spec1.RestoreMetadata.ProjectStyle = ProjectStyle.ProjectJson;
+
+            var logger = new TestLogger();
+            var request = new TestRestoreRequest(spec1, sources: Enumerable.Empty<PackageSource>(), packagesDirectory: projectPath, logger)
+            {
+                LockFilePath = Path.Combine(projectPath, "project.lock.json")
+            };
+
+            // Act
+            var command = new RestoreCommand(request);
+            var result = await command.ExecuteAsync();
+            await result.CommitAsync(logger, CancellationToken.None);
+
+            // Assert
+            result.Success.Should().BeFalse();
+            result.LockFile.LogMessages.Count.Should().BeGreaterThanOrEqualTo(1);
+
+            IAssetsLogMessage resultLogMessage = result.LockFile.LogMessages.SingleOrDefault(logMessage => logMessage.Code == NuGetLogCode.NU1016);
+            resultLogMessage.Level.Should().Be(LogLevel.Error);
+            resultLogMessage.Message.Should().Be(Strings.Error_ProjectJson_Deprecated);
+        }
+
+        [Fact]
         public async Task RestoreCommand_FileUriV3FolderAsync()
         {
             // Arrange
@@ -489,7 +531,7 @@ namespace NuGet.Commands.Test.RestoreCommandTests
                 File.WriteAllText(Path.Combine(project1.FullName, "project.json"), project1Json);
 
                 var specPath1 = Path.Combine(project1.FullName, "project.json");
-                var spec1 = JsonPackageSpecReader.GetPackageSpec(project1Json, "project1", specPath1).EnsureProjectJsonRestoreMetadata();
+                var spec1 = JsonPackageSpecReader.GetPackageSpec(project1Json, "project1", specPath1).WithTestRestoreMetadata();
 
                 var logger = new TestLogger();
                 var request = new TestRestoreRequest(spec1, sources, packagesDir.FullName, logger)
@@ -551,7 +593,7 @@ namespace NuGet.Commands.Test.RestoreCommandTests
                 File.WriteAllText(Path.Combine(project1.FullName, "project.json"), project1Json);
 
                 var specPath1 = Path.Combine(project1.FullName, "project.json");
-                var spec1 = JsonPackageSpecReader.GetPackageSpec(project1Json, "project1", specPath1).EnsureProjectJsonRestoreMetadata();
+                var spec1 = JsonPackageSpecReader.GetPackageSpec(project1Json, "project1", specPath1).WithTestRestoreMetadata();
 
                 var logger = new TestLogger();
                 var request = new TestRestoreRequest(spec1, sources, packagesDir.FullName, logger)
@@ -611,7 +653,7 @@ namespace NuGet.Commands.Test.RestoreCommandTests
                 File.WriteAllText(Path.Combine(project1.FullName, "project.json"), project1Json);
 
                 var specPath1 = Path.Combine(project1.FullName, "project.json");
-                var spec1 = JsonPackageSpecReader.GetPackageSpec(project1Json, "project1", specPath1).EnsureProjectJsonRestoreMetadata();
+                var spec1 = JsonPackageSpecReader.GetPackageSpec(project1Json, "project1", specPath1).WithTestRestoreMetadata();
 
                 var logger = new TestLogger();
                 var request = new TestRestoreRequest(spec1, sources, packagesDir.FullName, logger)
@@ -671,7 +713,7 @@ namespace NuGet.Commands.Test.RestoreCommandTests
                 File.WriteAllText(Path.Combine(project1.FullName, "project.json"), project1Json);
 
                 var specPath1 = Path.Combine(project1.FullName, "project.json");
-                var spec1 = JsonPackageSpecReader.GetPackageSpec(project1Json, "PROJECT1", specPath1).EnsureProjectJsonRestoreMetadata();
+                var spec1 = JsonPackageSpecReader.GetPackageSpec(project1Json, "PROJECT1", specPath1).WithTestRestoreMetadata();
 
                 var logger = new TestLogger();
                 var request = new TestRestoreRequest(spec1, sources, packagesDir.FullName, logger)
@@ -738,7 +780,7 @@ namespace NuGet.Commands.Test.RestoreCommandTests
                 File.WriteAllText(Path.Combine(project1.FullName, "project.json"), project1Json);
 
                 var specPath1 = Path.Combine(project1.FullName, "project.json");
-                var spec1 = JsonPackageSpecReader.GetPackageSpec(project1Json, "project1", specPath1).EnsureProjectJsonRestoreMetadata();
+                var spec1 = JsonPackageSpecReader.GetPackageSpec(project1Json, "project1", specPath1).WithTestRestoreMetadata();
 
                 var logger = new TestLogger();
                 var request = new TestRestoreRequest(spec1, sources, packagesDir.FullName, logger)
@@ -808,7 +850,7 @@ namespace NuGet.Commands.Test.RestoreCommandTests
                 File.WriteAllText(Path.Combine(project1.FullName, "project.json"), project1Json);
 
                 var specPath1 = Path.Combine(project1.FullName, "project.json");
-                var spec1 = JsonPackageSpecReader.GetPackageSpec(project1Json, "project1", specPath1).EnsureProjectJsonRestoreMetadata();
+                var spec1 = JsonPackageSpecReader.GetPackageSpec(project1Json, "project1", specPath1).WithTestRestoreMetadata();
 
                 var logger = new TestLogger();
                 var request = new TestRestoreRequest(spec1, sources, packagesDir.FullName, logger)
@@ -878,7 +920,7 @@ namespace NuGet.Commands.Test.RestoreCommandTests
                 File.WriteAllText(Path.Combine(project1.FullName, "project.json"), project1Json);
 
                 var specPath1 = Path.Combine(project1.FullName, "project.json");
-                var spec1 = JsonPackageSpecReader.GetPackageSpec(project1Json, "project1", specPath1).EnsureProjectJsonRestoreMetadata();
+                var spec1 = JsonPackageSpecReader.GetPackageSpec(project1Json, "project1", specPath1).WithTestRestoreMetadata();
 
                 var logger = new TestLogger();
                 var request = new TestRestoreRequest(spec1, sources, packagesDir.FullName, logger)
@@ -948,7 +990,7 @@ namespace NuGet.Commands.Test.RestoreCommandTests
                 File.WriteAllText(Path.Combine(project1.FullName, "project.json"), project1Json);
 
                 var specPath1 = Path.Combine(project1.FullName, "project.json");
-                var spec1 = JsonPackageSpecReader.GetPackageSpec(project1Json, "project1", specPath1).EnsureProjectJsonRestoreMetadata();
+                var spec1 = JsonPackageSpecReader.GetPackageSpec(project1Json, "project1", specPath1).WithTestRestoreMetadata();
 
                 var logger = new TestLogger();
                 var request = new TestRestoreRequest(spec1, sources, packagesDir.FullName, logger)
@@ -981,7 +1023,6 @@ namespace NuGet.Commands.Test.RestoreCommandTests
             }
         }
 
-#if IS_SIGNING_SUPPORTED
         [PlatformFact(Platform.Windows)]
         public async Task RestoreCommand_InvalidSignedPackageAsync_FailsAsync()
         {
@@ -1018,7 +1059,7 @@ namespace NuGet.Commands.Test.RestoreCommandTests
                 File.WriteAllText(Path.Combine(project1.FullName, "project.json"), project1Json);
 
                 var specPath1 = Path.Combine(project1.FullName, "project.json");
-                var spec1 = JsonPackageSpecReader.GetPackageSpec(project1Json, "project1", specPath1).EnsureProjectJsonRestoreMetadata();
+                var spec1 = JsonPackageSpecReader.GetPackageSpec(project1Json, "project1", specPath1).WithTestRestoreMetadata();
 
                 var logger = new TestLogger();
 
@@ -1088,7 +1129,7 @@ namespace NuGet.Commands.Test.RestoreCommandTests
                 File.WriteAllText(Path.Combine(project1.FullName, "project.json"), project1Json);
 
                 var specPath1 = Path.Combine(project1.FullName, "project.json");
-                PackageSpec spec1 = JsonPackageSpecReader.GetPackageSpec(project1Json, "project1", specPath1).EnsureProjectJsonRestoreMetadata();
+                PackageSpec spec1 = JsonPackageSpecReader.GetPackageSpec(project1Json, "project1", specPath1).WithTestRestoreMetadata();
 
                 var logger = new TestLogger();
 
@@ -1158,7 +1199,7 @@ namespace NuGet.Commands.Test.RestoreCommandTests
                 File.WriteAllText(Path.Combine(project1.FullName, "project.json"), project1Json);
 
                 var specPath1 = Path.Combine(project1.FullName, "project.json");
-                var spec1 = JsonPackageSpecReader.GetPackageSpec(project1Json, "project1", specPath1).EnsureProjectJsonRestoreMetadata();
+                var spec1 = JsonPackageSpecReader.GetPackageSpec(project1Json, "project1", specPath1).WithTestRestoreMetadata();
 
                 var logger = new TestLogger();
 
@@ -1191,7 +1232,6 @@ namespace NuGet.Commands.Test.RestoreCommandTests
                 Assert.True(result.Success);
             }
         }
-#endif
 
         [Fact]
         public async Task RestoreCommand_PathInPackageLibraryAsync()
@@ -1225,7 +1265,7 @@ namespace NuGet.Commands.Test.RestoreCommandTests
                 File.WriteAllText(Path.Combine(project1.FullName, "project.json"), project1Json);
 
                 var specPath1 = Path.Combine(project1.FullName, "project.json");
-                var spec1 = JsonPackageSpecReader.GetPackageSpec(project1Json, "project1", specPath1).EnsureProjectJsonRestoreMetadata();
+                var spec1 = JsonPackageSpecReader.GetPackageSpec(project1Json, "project1", specPath1).WithTestRestoreMetadata();
 
                 var logger = new TestLogger();
                 var request = new TestRestoreRequest(spec1, sources, packagesDir.FullName, logger)
@@ -1260,16 +1300,11 @@ namespace NuGet.Commands.Test.RestoreCommandTests
             var project1Json = @"
             {
               ""version"": ""1.0.0-*"",
-              ""description"": """",
-              ""authors"": [ ""author"" ],
-              ""tags"": [ """" ],
-              ""projectUrl"": """",
-              ""licenseUrl"": """",
-              ""dependencies"": {
-                ""project1"": { ""version"": ""1.0.0"", ""target"": ""package"" }
-              },
               ""frameworks"": {
                 ""net45"": {
+                  ""dependencies"": {
+                    ""project1"": { ""version"": ""1.0.0"", ""target"": ""package"" }
+                  }
                 }
               }
             }";
@@ -1288,7 +1323,7 @@ namespace NuGet.Commands.Test.RestoreCommandTests
                 await SimpleTestPackageUtility.CreateFullPackageAsync(packageSource.FullName, "project1", "1.0.0");
 
                 var specPath1 = Path.Combine(project1.FullName, "project.json");
-                var spec1 = JsonPackageSpecReader.GetPackageSpec(project1Json, "project1", specPath1).EnsureProjectJsonRestoreMetadata();
+                var spec1 = JsonPackageSpecReader.GetPackageSpec(project1Json, "project1", specPath1).WithTestRestoreMetadata();
 
                 var logger = new TestLogger();
                 var request = new TestRestoreRequest(spec1, sources, packagesDir.FullName, logger)
@@ -1351,7 +1386,7 @@ namespace NuGet.Commands.Test.RestoreCommandTests
                 File.WriteAllText(Path.Combine(project1.FullName, "project.json"), project1Json);
 
                 var specPath1 = Path.Combine(project1.FullName, "project.json");
-                var spec1 = JsonPackageSpecReader.GetPackageSpec(project1Json, "project1", specPath1).EnsureProjectJsonRestoreMetadata();
+                var spec1 = JsonPackageSpecReader.GetPackageSpec(project1Json, "project1", specPath1).WithTestRestoreMetadata();
 
                 var logger = new TestLogger();
                 var request = new TestRestoreRequest(spec1, sources, packagesDir.FullName, logger)
@@ -1406,7 +1441,7 @@ namespace NuGet.Commands.Test.RestoreCommandTests
                 File.WriteAllText(Path.Combine(project1.FullName, "project.json"), project1Json);
 
                 var specPath1 = Path.Combine(project1.FullName, "project.json");
-                var spec1 = JsonPackageSpecReader.GetPackageSpec(project1Json, "project1", specPath1).EnsureProjectJsonRestoreMetadata();
+                var spec1 = JsonPackageSpecReader.GetPackageSpec(project1Json, "project1", specPath1).WithTestRestoreMetadata();
 
                 var logger = new TestLogger();
                 var request = new TestRestoreRequest(spec1, sources, packagesDir.FullName, logger)
@@ -1468,7 +1503,7 @@ namespace NuGet.Commands.Test.RestoreCommandTests
         }
 
         [Fact]
-        public async Task RestoreCommand_CentralVersion_ErrorWhenDependenciesHaveVersion()
+        public async Task ExecuteAsync_CentralPackageManagementEnabled_WhenPackageReferencesHaveVersion_LogsAnError()
         {
             // Arrange
             using (var pathContext = new SimpleTestPathContext())
@@ -1479,7 +1514,7 @@ namespace NuGet.Commands.Test.RestoreCommandTests
                 var dependencyBar = new LibraryDependency(new LibraryRange("bar", VersionRange.Parse("3.0.0"), LibraryDependencyTarget.All),
                         LibraryIncludeFlags.All,
                         LibraryIncludeFlags.All,
-                        new List<NuGetLogCode>(),
+                        noWarn: [],
                         autoReferenced: false,
                         generatePathProperty: true,
                         versionCentrallyManaged: false,
@@ -1490,7 +1525,7 @@ namespace NuGet.Commands.Test.RestoreCommandTests
                 var centralVersionFoo = new CentralPackageVersion("foo", VersionRange.Parse("1.0.0"));
                 var centralVersionBar = new CentralPackageVersion("bar", VersionRange.Parse("2.0.0"));
 
-                var tfi = CreateTargetFrameworkInformation(new List<LibraryDependency>() { dependencyBar }, new List<CentralPackageVersion>() { centralVersionFoo, centralVersionBar });
+                var tfi = CreateTargetFrameworkInformation([dependencyBar], new List<CentralPackageVersion>() { centralVersionFoo, centralVersionBar });
                 var packageSpec = new PackageSpec(new List<TargetFrameworkInformation>() { tfi });
                 packageSpec.RestoreMetadata = new ProjectRestoreMetadata()
                 {
@@ -1518,17 +1553,17 @@ namespace NuGet.Commands.Test.RestoreCommandTests
                 Assert.False(result.Success);
                 Assert.Equal(1, logger.ErrorMessages.Count);
                 logger.ErrorMessages.TryDequeue(out var errorMessage);
-                Assert.True(errorMessage.Contains("Projects that use central package version management should not define the version on the PackageReference items but on the PackageVersion"));
-                Assert.True(errorMessage.Contains("bar"));
-                var NU1801Messages = result.LockFile.LogMessages.Where(m => m.Code == NuGetLogCode.NU1008);
-                Assert.Equal(1, NU1801Messages.Count());
+                Assert.EndsWith(string.Format(CultureInfo.CurrentCulture, Strings.Error_CentralPackageManagement_PackageReferenceWithVersionNotAllowed, "bar"), errorMessage);
+
+                var NU1008Messages = result.LockFile.LogMessages.Where(m => m.Code == NuGetLogCode.NU1008);
+                Assert.Equal(1, NU1008Messages.Count());
             }
         }
 
         [Theory]
         [InlineData("bar")]
         [InlineData("Bar")]
-        public async Task RestoreCommand_CentralVersion_ErrorWhenCentralPackageVersionFileContainsAutoReferencedReferences(string autoreferencedpackageId)
+        public async Task RestoreCommand_CentralPackageManagement_ErrorWhenCentralPackageVersionFileContainsAutoReferencedReferences(string autoreferencedpackageId)
         {
             // Arrange
             using (var pathContext = new SimpleTestPathContext())
@@ -1543,7 +1578,7 @@ namespace NuGet.Commands.Test.RestoreCommandTests
                         LibraryDependencyTarget.All),
                     LibraryIncludeFlags.All,
                     LibraryIncludeFlags.All,
-                    new List<NuGetLogCode>(),
+                    noWarn: [],
                     autoReferenced: true,
                     generatePathProperty: true,
                     versionCentrallyManaged: false,
@@ -1554,7 +1589,7 @@ namespace NuGet.Commands.Test.RestoreCommandTests
                 var centralVersionFoo = new CentralPackageVersion("foo", VersionRange.Parse("1.0.0"));
                 var centralVersionBar = new CentralPackageVersion(autoreferencedpackageId.ToLowerInvariant(), VersionRange.Parse("2.0.0"));
 
-                var tfi = CreateTargetFrameworkInformation(new List<LibraryDependency>() { dependencyBar }, new List<CentralPackageVersion>() { centralVersionFoo, centralVersionBar });
+                var tfi = CreateTargetFrameworkInformation([dependencyBar], new List<CentralPackageVersion>() { centralVersionFoo, centralVersionBar });
                 var packageSpec = new PackageSpec(new List<TargetFrameworkInformation>() { tfi });
                 packageSpec.RestoreMetadata = new ProjectRestoreMetadata()
                 {
@@ -1582,15 +1617,15 @@ namespace NuGet.Commands.Test.RestoreCommandTests
                 Assert.False(result.Success);
                 Assert.Equal(1, logger.ErrorMessages.Count);
                 logger.ErrorMessages.TryDequeue(out var errorMessage);
-                Assert.True(errorMessage.Contains("You do not typically need to reference them from your project or in your central package versions management file. For more information, see https://aka.ms/sdkimplicitrefs"));
-                Assert.True(errorMessage.Contains(autoreferencedpackageId));
+                Assert.EndsWith(string.Format(CultureInfo.CurrentCulture, Strings.Error_CentralPackageManagement_ImplicitPackageReferenceWithVersionNotAllowed, autoreferencedpackageId), errorMessage);
+
                 var NU1009Messages = result.LockFile.LogMessages.Where(m => m.Code == NuGetLogCode.NU1009);
                 Assert.Equal(1, NU1009Messages.Count());
             }
         }
 
         [Fact]
-        public async Task RestoreCommand_CentralVersion_NoWarningWhenOnlyOneFeedAndPackageSourceMappingNotUsed()
+        public async Task RestoreCommand_CentralPackageManagement_NoWarningWhenOnlyOneFeedAndPackageSourceMappingNotUsed()
         {
             // Arrange
             using (var pathContext = new SimpleTestPathContext())
@@ -1618,7 +1653,7 @@ namespace NuGet.Commands.Test.RestoreCommandTests
                         LibraryDependencyTarget.All),
                     LibraryIncludeFlags.All,
                     LibraryIncludeFlags.All,
-                    new List<NuGetLogCode>(),
+                    noWarn: [],
                     autoReferenced: false,
                     generatePathProperty: false,
                     versionCentrallyManaged: false,
@@ -1628,7 +1663,7 @@ namespace NuGet.Commands.Test.RestoreCommandTests
 
                 var centralVersionFoo = new CentralPackageVersion("foo", VersionRange.Parse("1.0.0"));
 
-                var tfi = CreateTargetFrameworkInformation(new List<LibraryDependency>() { dependencyBar }, new List<CentralPackageVersion>() { centralVersionFoo });
+                var tfi = CreateTargetFrameworkInformation([dependencyBar], new List<CentralPackageVersion>() { centralVersionFoo });
                 var packageSpec = new PackageSpec(new List<TargetFrameworkInformation>() { tfi })
                 {
                     FilePath = projectPath,
@@ -1671,7 +1706,7 @@ namespace NuGet.Commands.Test.RestoreCommandTests
         [Theory]
         [InlineData(true)]
         [InlineData(false)]
-        public async Task RestoreCommand_CentralVersion_WarningWhenMoreThanOneFeedAndPackageSourceMappingNotUsed(bool enablePackageSourceMapping)
+        public async Task RestoreCommand_CentralPackageManagement_WarningWhenMoreThanOneFeedAndPackageSourceMappingNotUsed(bool enablePackageSourceMapping)
         {
             // Arrange
             using (var pathContext = new SimpleTestPathContext())
@@ -1700,7 +1735,7 @@ namespace NuGet.Commands.Test.RestoreCommandTests
                         LibraryDependencyTarget.All),
                     LibraryIncludeFlags.All,
                     LibraryIncludeFlags.All,
-                    new List<NuGetLogCode>(),
+                    noWarn: [],
                     autoReferenced: false,
                     generatePathProperty: false,
                     versionCentrallyManaged: false,
@@ -1710,7 +1745,7 @@ namespace NuGet.Commands.Test.RestoreCommandTests
 
                 var centralVersionFoo = new CentralPackageVersion("foo", VersionRange.Parse("1.0.0"));
 
-                var tfi = CreateTargetFrameworkInformation(new List<LibraryDependency>() { dependencyBar }, new List<CentralPackageVersion>() { centralVersionFoo });
+                var tfi = CreateTargetFrameworkInformation([dependencyBar], new List<CentralPackageVersion>() { centralVersionFoo });
                 var packageSpec = new PackageSpec(new List<TargetFrameworkInformation>() { tfi })
                 {
                     FilePath = projectPath,
@@ -1820,7 +1855,7 @@ namespace NuGet.Commands.Test.RestoreCommandTests
 
             // Act
             var rootNode = await DoWalkAsync(walker, "A", framework);
-            RestoreTargetGraph restoreTargetGraph = RestoreTargetGraph.Create(new List<GraphNode<RemoteResolveResult>>() { rootNode }, context, logger, framework);
+            RestoreTargetGraph restoreTargetGraph = RestoreTargetGraph.Create(new List<GraphNode<RemoteResolveResult>>() { rootNode }, context, logger, framework.GetShortFolderName(), framework);
 
             await RestoreCommand.LogDowngradeWarningsOrErrorsAsync(new List<RestoreTargetGraph>() { restoreTargetGraph }, logger);
 
@@ -1989,7 +2024,7 @@ namespace NuGet.Commands.Test.RestoreCommandTests
         [Theory]
         [InlineData(true)]
         [InlineData(false)]
-        public async Task RestoreCommand_CentralVersion_ErrorWhenFloatingCentralVersions(bool enabled)
+        public async Task RestoreCommand_CentralPackageManagement_ErrorWhenFloatingCentralVersions(bool enabled)
         {
             // Arrange
             using (var pathContext = new SimpleTestPathContext())
@@ -2013,7 +2048,7 @@ namespace NuGet.Commands.Test.RestoreCommandTests
                 var centralVersionFoo = new CentralPackageVersion("foo", VersionRange.Parse("1.*", allowFloating: true));
 
                 var tfi = CreateTargetFrameworkInformation(
-                    new List<LibraryDependency>() { packageRefDependecyFoo },
+                    [packageRefDependecyFoo],
                     new List<CentralPackageVersion>() { centralVersionFoo });
 
                 var packageSpec = new PackageSpec(new List<TargetFrameworkInformation>() { tfi })
@@ -2056,7 +2091,8 @@ namespace NuGet.Commands.Test.RestoreCommandTests
                     Assert.False(result.Success);
                     Assert.Equal(1, logger.ErrorMessages.Count);
                     logger.ErrorMessages.TryDequeue(out var errorMessage);
-                    Assert.True(errorMessage.Contains("Centrally defined floating package versions are not allowed."));
+                    Assert.EndsWith(string.Format(CultureInfo.CurrentCulture, Strings.Error_CentralPackageManagement_FloatingVersionsNotAllowed, "foo"), errorMessage);
+
                     var messagesForNU1011 = result.LockFile.LogMessages.Where(m => m.Code == NuGetLogCode.NU1011);
                     Assert.Equal(1, messagesForNU1011.Count());
                 }
@@ -2064,7 +2100,7 @@ namespace NuGet.Commands.Test.RestoreCommandTests
         }
 
         [Fact]
-        public async Task RestoreCommand_CentralVersion_ErrorWhenNotAllPRItemsHaveCorespondingPackageVersion()
+        public async Task RestoreCommand_CentralPackageManagement_ErrorWhenNotAllPRItemsHaveCorrespondingPackageVersion()
         {
             // Arrange
             using (var pathContext = new SimpleTestPathContext())
@@ -2073,7 +2109,7 @@ namespace NuGet.Commands.Test.RestoreCommandTests
                 var projectPath = Path.Combine(pathContext.SolutionRoot, projectName);
                 var outputPath = Path.Combine(projectPath, "obj");
                 // Package Bar does not have a corresponding PackageVersion
-                var packageRefDependecyBar = new LibraryDependency()
+                var packageRefDependencyBar = new LibraryDependency()
                 {
                     LibraryRange = new LibraryRange("bar", versionRange: null, typeConstraint: LibraryDependencyTarget.Package),
                 };
@@ -2081,7 +2117,7 @@ namespace NuGet.Commands.Test.RestoreCommandTests
                 var centralVersionFoo = new CentralPackageVersion("foo", VersionRange.Parse("1.0.0"));
 
                 var tfi = CreateTargetFrameworkInformation(
-                    new List<LibraryDependency>() { packageRefDependecyBar },
+                    [packageRefDependencyBar],
                     new List<CentralPackageVersion>() { centralVersionFoo });
 
                 var packageSpec = new PackageSpec(new List<TargetFrameworkInformation>() { tfi });
@@ -2114,14 +2150,15 @@ namespace NuGet.Commands.Test.RestoreCommandTests
                 Assert.False(result.Success);
                 Assert.Equal(1, logger.ErrorMessages.Count);
                 logger.ErrorMessages.TryDequeue(out var errorMessage);
-                Assert.True(errorMessage.Contains("The PackageReference items bar do not have corresponding PackageVersion."));
+                Assert.EndsWith(string.Format(CultureInfo.CurrentCulture, Strings.Error_CentralPackageManagement_MissingPackageVersion, "bar"), errorMessage);
+
                 var messagesForNU1010 = result.LockFile.LogMessages.Where(m => m.Code == NuGetLogCode.NU1010);
                 Assert.Equal(1, messagesForNU1010.Count());
             }
         }
 
         [Fact]
-        public async Task RestoreCommand_CentralVersion_Multitargeting_NoFailureSamePackageInTwoFrameworsDirectAndTransitive()
+        public async Task RestoreCommand_CentralPackageManagement_Multitargeting_NoFailureSamePackageInTwoFrameworksDirectAndTransitive()
         {
             // Arrange
             using (var pathContext = new SimpleTestPathContext())
@@ -2202,7 +2239,7 @@ namespace NuGet.Commands.Test.RestoreCommandTests
         }
 
         [Fact]
-        public async Task RestoreCommand_CentralVersion_AssetsFile_VerifyProjectsReferencesInTargets()
+        public async Task RestoreCommand_CentralPackageManagement_AssetsFile_VerifyProjectsReferencesInTargets()
         {
             // Arrange
             var framework = new NuGetFramework("net46");
@@ -2236,7 +2273,7 @@ namespace NuGet.Commands.Test.RestoreCommandTests
                 await SimpleTestPackageUtility.CreateFullPackageAsync(pathContext.PackageSource, packageDummyontext);
 
                 var tfi = CreateTargetFrameworkInformation(
-                    new List<LibraryDependency>() { dependencyFoo },
+                    [dependencyFoo],
                     new List<CentralPackageVersion>() { centralVersionFoo, centralVersionDummy },
                     framework);
 
@@ -2268,7 +2305,7 @@ namespace NuGet.Commands.Test.RestoreCommandTests
                 var result = await restoreCommand.ExecuteAsync();
                 var lockFile = result.LockFile;
 
-                var targetLib = lockFile.Targets.First().Libraries.Where(l => l.Name == projectName2).FirstOrDefault();
+                var targetLib = lockFile.Targets.First().Libraries.FirstOrDefault(l => l.Name == projectName2);
 
                 // Assert
                 Assert.True(result.Success);
@@ -2283,7 +2320,7 @@ namespace NuGet.Commands.Test.RestoreCommandTests
         /// </summary>
         /// <returns></returns>
         [Fact]
-        public async Task RestoreCommand_CentralVersion_AssetsFile_PrivateAssetsFlowsToPinnedDependenciesWithTopLevelDependency()
+        public async Task RestoreCommand_CentralPackageManagement_AssetsFile_PrivateAssetsFlowsToPinnedDependenciesWithTopLevelDependency()
         {
             // Arrange
             var framework = new NuGetFramework("net46");
@@ -2325,8 +2362,7 @@ namespace NuGet.Commands.Test.RestoreCommandTests
                 await SimpleTestPackageUtility.CreateFullPackageAsync(pathContext.PackageSource, packageAContext);
 
                 var tfi = CreateTargetFrameworkInformation(
-                    new List<LibraryDependency>
-                    {
+                    [
                         new LibraryDependency()
                         {
                             LibraryRange = new LibraryRange()
@@ -2347,7 +2383,7 @@ namespace NuGet.Commands.Test.RestoreCommandTests
                             VersionCentrallyManaged = true,
                             SuppressParent = LibraryIncludeFlags.Build
                         }
-                    },
+                    ],
                     new List<CentralPackageVersion>
                     {
                         new CentralPackageVersion(packageA.Id, new VersionRange(packageA.Version)),
@@ -2378,7 +2414,7 @@ namespace NuGet.Commands.Test.RestoreCommandTests
                 var result = await restoreCommand.ExecuteAsync();
                 var lockFile = result.LockFile;
 
-                var targetLib = lockFile.Targets.First().Libraries.Where(l => l.Name == packageA.Id).FirstOrDefault();
+                var targetLib = lockFile.Targets.First().Libraries.FirstOrDefault(l => l.Name == packageA.Id);
 
                 // Assert
                 Assert.True(result.Success);
@@ -2401,7 +2437,7 @@ namespace NuGet.Commands.Test.RestoreCommandTests
         /// </summary>
         /// <returns></returns>
         [Fact]
-        public async Task RestoreCommand_CentralVersion_AssetsFile_PrivateAssetsFlowsToPinnedDependenciesWithSingleParent()
+        public async Task RestoreCommand_CentralPackageManagement_AssetsFile_PrivateAssetsFlowsToPinnedDependenciesWithSingleParent()
         {
             // Arrange
             var framework = new NuGetFramework("net46");
@@ -2443,8 +2479,7 @@ namespace NuGet.Commands.Test.RestoreCommandTests
                 await SimpleTestPackageUtility.CreateFullPackageAsync(pathContext.PackageSource, packageAContext);
 
                 var tfi = CreateTargetFrameworkInformation(
-                    new List<LibraryDependency>
-                    {
+                    [
                         new LibraryDependency()
                         {
                             LibraryRange = new LibraryRange()
@@ -2455,7 +2490,7 @@ namespace NuGet.Commands.Test.RestoreCommandTests
                             VersionCentrallyManaged = true,
                             SuppressParent = LibraryIncludeFlags.Runtime | LibraryIncludeFlags.Compile
                         },
-                    },
+                    ],
                     new List<CentralPackageVersion>
                     {
                         new CentralPackageVersion(packageA.Id, new VersionRange(packageA.Version)),
@@ -2486,7 +2521,7 @@ namespace NuGet.Commands.Test.RestoreCommandTests
                 var result = await restoreCommand.ExecuteAsync();
                 var lockFile = result.LockFile;
 
-                var targetLib = lockFile.Targets.First().Libraries.Where(l => l.Name == packageA.Id).FirstOrDefault();
+                var targetLib = lockFile.Targets.First().Libraries.FirstOrDefault(l => l.Name == packageA.Id);
 
                 // Assert
                 Assert.True(result.Success);
@@ -2509,7 +2544,7 @@ namespace NuGet.Commands.Test.RestoreCommandTests
         [Theory]
         [InlineData(LibraryIncludeFlags.All, 0)]
         [InlineData(LibraryIncludeFlags.None, 1)]
-        public async Task RestoreCommand_CentralVersion_AssetsFile_PrivateAssetsFlowsToPinnedDependenciesWithSingleParentProject(LibraryIncludeFlags privateAssets, int expectedCount)
+        public async Task RestoreCommand_CentralPackageManagement_AssetsFile_PrivateAssetsFlowsToPinnedDependenciesWithSingleParentProject(LibraryIncludeFlags privateAssets, int expectedCount)
         {
             // Arrange
             using (var testPathContext = new SimpleTestPathContext())
@@ -2529,15 +2564,18 @@ namespace NuGet.Commands.Test.RestoreCommandTests
                         new TargetFrameworkInformation
                         {
                             FrameworkName = NuGetFramework.Parse("net46"),
-                            Dependencies = new List<LibraryDependency>(new[]
-                            {
+                            Dependencies =
+                            [
                                 new LibraryDependency
                                 {
                                     LibraryRange = new LibraryRange("PackageA", VersionRange.Parse("1.0.0"), LibraryDependencyTarget.All),
                                     VersionCentrallyManaged = true,
                                 },
-                            }),
-                            CentralPackageVersions = { new KeyValuePair<string, CentralPackageVersion>("PackageA", new CentralPackageVersion("PackageA", VersionRange.Parse("1.0.0"))) },
+                            ],
+                            CentralPackageVersions = new Dictionary<string, CentralPackageVersion>(StringComparer.OrdinalIgnoreCase)
+                            {
+                                { "PackageA", new CentralPackageVersion("PackageA", VersionRange.Parse("1.0.0")) },
+                            }
                         }
                     })
                     .WithCentralPackageVersionsEnabled()
@@ -2551,8 +2589,11 @@ namespace NuGet.Commands.Test.RestoreCommandTests
                         new TargetFrameworkInformation
                         {
                             FrameworkName = NuGetFramework.Parse("net46"),
-                            Dependencies = new List<LibraryDependency>(),
-                            CentralPackageVersions = { new KeyValuePair<string, CentralPackageVersion>("PackageA", new CentralPackageVersion("PackageA", VersionRange.Parse("1.0.0"))) },
+                            Dependencies = [],
+                            CentralPackageVersions = new Dictionary<string, CentralPackageVersion>(StringComparer.OrdinalIgnoreCase)
+                            {
+                                { "PackageA", new CentralPackageVersion("PackageA", VersionRange.Parse("1.0.0")) },
+                            }
                         }
                     })
                     .WithCentralPackageVersionsEnabled()
@@ -2595,7 +2636,7 @@ namespace NuGet.Commands.Test.RestoreCommandTests
         [InlineData(LibraryIncludeFlags.All, LibraryIncludeFlags.All, LibraryIncludeFlags.All)] // When both parents have PrivateAssets="All", expect that the dependency does not flow
         [InlineData(LibraryIncludeFlags.None, LibraryIncludeFlags.None, LibraryIncludeFlags.None)] // When both parents have PrivateAssets="None", expect all assets of the dependency to flow
         [InlineData(LibraryIncludeFlags.None, LibraryIncludeFlags.Runtime | LibraryIncludeFlags.Compile, LibraryIncludeFlags.None)] // When both parents have PrivateAssets="None", expect that the dependency is completely suppressed
-        public async Task RestoreCommand_CentralVersion_AssetsFile_PrivateAssetsFlowsToPinnedDependenciesWithMultipleParents(LibraryIncludeFlags suppressParent1, LibraryIncludeFlags suppressParent2, LibraryIncludeFlags expected)
+        public async Task RestoreCommand_CentralPackageManagement_AssetsFile_PrivateAssetsFlowsToPinnedDependenciesWithMultipleParents(LibraryIncludeFlags suppressParent1, LibraryIncludeFlags suppressParent2, LibraryIncludeFlags expected)
         {
             // Arrange
             var framework = new NuGetFramework("net46");
@@ -2637,8 +2678,7 @@ namespace NuGet.Commands.Test.RestoreCommandTests
                 await SimpleTestPackageUtility.CreateFullPackageAsync(pathContext.PackageSource, packageAContext);
 
                 var tfi = CreateTargetFrameworkInformation(
-                    new List<LibraryDependency>
-                    {
+                    [
                         new LibraryDependency()
                         {
                             LibraryRange = new LibraryRange()
@@ -2659,7 +2699,7 @@ namespace NuGet.Commands.Test.RestoreCommandTests
                             VersionCentrallyManaged = true,
                             SuppressParent = suppressParent2,
                         },
-                    },
+                    ],
                     new List<CentralPackageVersion>
                     {
                         new CentralPackageVersion(packageA.Id, new VersionRange(packageA.Version)),
@@ -2720,7 +2760,7 @@ namespace NuGet.Commands.Test.RestoreCommandTests
         [InlineData(true, false)]
         [InlineData(false, true)]
         [InlineData(false, false)]
-        public async Task RestoreCommand_CentralVersion_ErrorWhenVersionOverrideUsedButIsDisabled(bool isCentralPackageVersionOverrideDisabled, bool isVersionOverrideUsed)
+        public async Task RestoreCommand_CentralPackageManagement_ErrorWhenVersionOverrideUsedButIsDisabled(bool isCentralPackageVersionOverrideDisabled, bool isVersionOverrideUsed)
         {
             const string projectName = "TestProject";
 
@@ -2737,19 +2777,13 @@ namespace NuGet.Commands.Test.RestoreCommandTests
                 var packageRefDependencyFoo = new LibraryDependency()
                 {
                     LibraryRange = new LibraryRange(packageName, versionRange: null, typeConstraint: LibraryDependencyTarget.Package),
+                    VersionOverride = isVersionOverrideUsed ? new VersionRange(NuGetVersion.Parse("2.0.0")) : null
                 };
-                if (isVersionOverrideUsed)
-                {
-                    packageRefDependencyFoo.VersionOverride = new VersionRange(NuGetVersion.Parse("2.0.0"));
-                }
 
                 var packageVersion = new CentralPackageVersion(packageName, VersionRange.Parse("1.0.0"));
 
                 TargetFrameworkInformation targetFrameworkInformation = CreateTargetFrameworkInformation(
-                    new List<LibraryDependency>
-                    {
-                        packageRefDependencyFoo
-                    },
+                    [packageRefDependencyFoo],
                     new List<CentralPackageVersion>
                     {
                         packageVersion
@@ -2838,7 +2872,7 @@ namespace NuGet.Commands.Test.RestoreCommandTests
             // Assert
             result.Success.Should().BeTrue(because: logger.ShowMessages());
             IEnumerable<string> telEventNames = telemetryEvents.Select(e => e.Name);
-            telemetryEvents.Should().HaveCountLessOrEqualTo(3);
+            telemetryEvents.Should().HaveCountLessThanOrEqualTo(3);
             telEventNames.Should().Contain("ProjectRestoreInformation");
 
             var projectInformationEvent = telemetryEvents.Single(e => e.Name.Equals("ProjectRestoreInformation"));
@@ -2891,11 +2925,35 @@ namespace NuGet.Commands.Test.RestoreCommandTests
                 ["Audit.Vulnerability.Transitive.Severity2"] = value => value.Should().Be(0),
                 ["Audit.Vulnerability.Transitive.Severity3"] = value => value.Should().Be(0),
                 ["Audit.Vulnerability.Transitive.SeverityInvalid"] = value => value.Should().Be(0),
+                ["Audit.Vulnerability.PackageDownload.Severity0"] = value => value.Should().Be(0),
+                ["Audit.Vulnerability.PackageDownload.Severity1"] = value => value.Should().Be(0),
+                ["Audit.Vulnerability.PackageDownload.Severity2"] = value => value.Should().Be(0),
+                ["Audit.Vulnerability.PackageDownload.Severity3"] = value => value.Should().Be(0),
+                ["Audit.Vulnerability.PackageDownload.SeverityInvalid"] = value => value.Should().Be(0),
+                ["Audit.Vulnerability.PackageDownloads.TotalWarningsSuppressed.Count"] = value => value.Should().Be(0),
+                ["Audit.Vulnerability.PackageDownload.DistinctAdvisoriesSuppressed.Count"] = value => value.Should().Be(0),
                 ["Audit.DataSources"] = value => value.Should().Be(0),
                 ["Audit.Duration.Download"] = value => value.Should().BeOfType<double>(),
                 ["Audit.Duration.Total"] = value => value.Should().BeOfType<double>(),
                 ["UseLegacyDependencyResolver"] = value => value.Should().BeOfType<bool>(),
                 ["UsedLegacyDependencyResolver"] = value => value.Should().BeOfType<bool>(),
+                ["TargetFrameworksCount"] = value => value.Should().Be(1),
+                ["RuntimeIdentifiersCount"] = value => value.Should().Be(0),
+                ["TreatWarningsAsErrors"] = value => value.Should().Be(false),
+                ["SDKAnalysisLevel"] = value => value.Should().Be(null),
+                ["UsingMicrosoftNETSdk"] = value => value.Should().Be(false),
+                ["IsPackageInstallationTrigger"] = value => value.Should().Be(false),
+                ["ForceRestore"] = value => value.Should().Be(false),
+                ["UpdatedAssetsFile"] = value => value.Should().Be(true),
+                ["UpdatedMSBuildFiles"] = value => value.Should().Be(true),
+                ["NETSdkVersion"] = value => value.Should().Be(null),
+                ["Pruning.FrameworksEnabled.Count"] = value => value.Should().BeOfType<int>(),
+                ["Pruning.FrameworksDisabled.Count"] = value => value.Should().BeOfType<int>(),
+                ["Pruning.FrameworksUnsupported.Count"] = value => value.Should().BeOfType<int>(),
+                ["Pruning.DefaultEnabled"] = value => value.Should().BeOfType<bool>(),
+                ["Pruning.RemovablePackages.Count"] = value => value.Should().BeOfType<int>(),
+                ["Pruning.Pruned.Direct.Count"] = value => value.Should().BeOfType<int>(),
+                ["UsesLegacyPackagesDirectory"] = value => value.Should().Be(false),
             };
 
             HashSet<string> actualProperties = new();
@@ -2915,6 +2973,43 @@ namespace NuGet.Commands.Test.RestoreCommandTests
         }
 
         [Fact]
+        public async Task ExecuteAsync_WithSuppressedWarning_PopulatesCorrectTelemetry()
+        {
+            // Arrange
+            using var pathContext = new SimpleTestPathContext();
+            var projectName = "TestProject";
+            var projectPath = Path.Combine(pathContext.SolutionRoot, projectName);
+            PackageSpec packageSpec = ProjectTestHelpers.GetPackageSpec(projectName, pathContext.SolutionRoot, "net472", "a");
+            packageSpec.RestoreMetadata.ProjectWideWarningProperties.NoWarn.Add(NuGetLogCode.NU1603);
+
+            await SimpleTestPackageUtility.CreateFolderFeedV3Async(
+                pathContext.PackageSource,
+                PackageSaveMode.Defaultv3,
+                new SimpleTestPackageContext("a", "1.5.0"));
+
+            var logger = new TestLogger();
+
+            // Set-up telemetry service - Important to set-up the service *after* the package source creation call as that emits telemetry!
+            var telemetryEvents = new ConcurrentQueue<TelemetryEvent>();
+            var _telemetryService = new Mock<INuGetTelemetryService>(MockBehavior.Loose);
+            _telemetryService
+                .Setup(x => x.EmitTelemetryEvent(It.IsAny<TelemetryEvent>()))
+                .Callback<TelemetryEvent>(x => telemetryEvents.Enqueue(x));
+
+            TelemetryActivity.NuGetTelemetryService = _telemetryService.Object;
+
+            //Act
+            var request = ProjectTestHelpers.CreateRestoreRequest(pathContext, logger, packageSpec);
+            var restoreCommand = new RestoreCommand(request);
+            RestoreResult result = await restoreCommand.ExecuteAsync();
+
+            // Assert
+            var projectInformationEvent = telemetryEvents.Single(e => e.Name.Equals("ProjectRestoreInformation"));
+            Assert.Equal("NU1603", projectInformationEvent["SuppressedWarningCodes"]);
+            Assert.Null(projectInformationEvent["WarningCodes"]);
+        }
+
+        [Fact]
         public async Task ExecuteAsync_WithSinglePackage_WhenNoOping_PopulatesCorrectTelemetry()
         {
             // Arrange
@@ -2923,6 +3018,10 @@ namespace NuGet.Commands.Test.RestoreCommandTests
             var projectName = "TestProject";
             var projectPath = Path.Combine(pathContext.SolutionRoot, projectName);
             PackageSpec packageSpec = ProjectTestHelpers.GetPackageSpec(projectName, pathContext.SolutionRoot, "net472", "a");
+            packageSpec.RestoreMetadata.ProjectWideWarningProperties.AllWarningsAsErrors = true;
+            packageSpec.RestoreMetadata.UsingMicrosoftNETSdk = true;
+            packageSpec.RestoreMetadata.SdkAnalysisLevel = NuGetVersion.Parse("9.0.100");
+            packageSpec.RestoreSettings.SdkVersion = NuGetVersion.Parse("10.0.100");
 
             await SimpleTestPackageUtility.CreateFolderFeedV3Async(
                 pathContext.PackageSource,
@@ -2951,7 +3050,7 @@ namespace NuGet.Commands.Test.RestoreCommandTests
             // Pre-conditions
             result.Success.Should().BeTrue(because: logger.ShowMessages());
             IEnumerable<string> telEventNames = telemetryEvents.Select(e => e.Name);
-            telemetryEvents.Should().HaveCountLessOrEqualTo(3);
+            telemetryEvents.Should().HaveCountLessThanOrEqualTo(3);
             telEventNames.Should().Contain("ProjectRestoreInformation");
 
             while (telemetryEvents.TryDequeue(out _))
@@ -2967,7 +3066,8 @@ namespace NuGet.Commands.Test.RestoreCommandTests
 
             var projectInformationEvent = telemetryEvents.Single(e => e.Name.Equals("ProjectRestoreInformation"));
 
-            projectInformationEvent.Count.Should().Be(24);
+            projectInformationEvent.Count.Should().Be(40);
+
             projectInformationEvent["RestoreSuccess"].Should().Be(true);
             projectInformationEvent["NoOpResult"].Should().Be(true);
             projectInformationEvent["IsCentralVersionManagementEnabled"].Should().Be(false);
@@ -2992,6 +3092,22 @@ namespace NuGet.Commands.Test.RestoreCommandTests
             projectInformationEvent["NoOpCacheFileAgeDays"].Should().NotBeNull();
             projectInformationEvent["UseLegacyDependencyResolver"].Should().BeOfType<bool>();
             projectInformationEvent["UsedLegacyDependencyResolver"].Should().BeOfType<bool>();
+            projectInformationEvent["Audit.Enabled"].Should().BeOfType<string>();
+            projectInformationEvent["TargetFrameworksCount"].Should().Be(1);
+            projectInformationEvent["RuntimeIdentifiersCount"].Should().Be(0);
+            projectInformationEvent["TreatWarningsAsErrors"].Should().Be(true);
+            projectInformationEvent["SDKAnalysisLevel"].Should().Be(NuGetVersion.Parse("9.0.100"));
+            projectInformationEvent["UsingMicrosoftNETSdk"].Should().Be(true);
+            projectInformationEvent["IsPackageInstallationTrigger"].Should().Be(false);
+            projectInformationEvent["ForceRestore"].Should().Be(false);
+            projectInformationEvent["UpdatedAssetsFile"].Should().Be(false);
+            projectInformationEvent["UpdatedMSBuildFiles"].Should().Be(false);
+            projectInformationEvent["NETSdkVersion"].Should().Be(NuGetVersion.Parse("10.0.100"));
+            projectInformationEvent["Pruning.FrameworksEnabled.Count"].Should().Be(0);
+            projectInformationEvent["Pruning.FrameworksDisabled.Count"].Should().Be(0);
+            projectInformationEvent["Pruning.FrameworksUnsupported.Count"].Should().Be(1);
+            projectInformationEvent["Pruning.DefaultEnabled"].Should().Be(false);
+            projectInformationEvent["UsesLegacyPackagesDirectory"].Should().Be(false);
         }
 
         [Fact]
@@ -3044,17 +3160,21 @@ namespace NuGet.Commands.Test.RestoreCommandTests
             // Assert
             result.Success.Should().BeTrue(because: logger.ShowMessages());
             IEnumerable<string> telEventNames = telemetryEvents.Select(e => e.Name);
-            telemetryEvents.Should().HaveCountLessOrEqualTo(3);
+            telemetryEvents.Should().HaveCountLessThanOrEqualTo(3);
             telEventNames.Should().Contain("ProjectRestoreInformation");
 
             var projectInformationEvent = telemetryEvents.Single(e => e.Name.Equals("ProjectRestoreInformation"));
 
-            projectInformationEvent.Count.Should().Be(31);
+            projectInformationEvent.Count.Should().Be(48);
             projectInformationEvent["RestoreSuccess"].Should().Be(true);
             projectInformationEvent["NoOpResult"].Should().Be(false);
             projectInformationEvent["TotalUniquePackagesCount"].Should().Be(2);
             projectInformationEvent["NewPackagesInstalledCount"].Should().Be(1);
             projectInformationEvent["PackageSourceMapping.IsMappingEnabled"].Should().Be(false);
+            projectInformationEvent["UpdatedAssetsFile"].Should().Be(true);
+            projectInformationEvent["UpdatedMSBuildFiles"].Should().Be(true);
+            projectInformationEvent["IsPackageInstallationTrigger"].Should().Be(false);
+            projectInformationEvent["ForceRestore"].Should().Be(false);
         }
 
         /// A 1.0.0 -> C 1.0.0 -> D 1.1.0
@@ -3168,17 +3288,17 @@ namespace NuGet.Commands.Test.RestoreCommandTests
                 await SimpleTestPackageUtility.CreateFullPackageAsync(pathContext.PackageSource, package3Context);
 
                 var tfiA = CreateTargetFrameworkInformation(
-                    new List<LibraryDependency>(), // no direct dependencies
+                    [], // no direct dependencies
                     new List<CentralPackageVersion>() { centralVersion1 },
                     framework);
 
                 var tfiB = CreateTargetFrameworkInformation(
-                    new List<LibraryDependency>(), // no direct dependencies
+                    [], // no direct dependencies
                     new List<CentralPackageVersion>() { centralVersion3 },
                     framework);
 
                 var tfiC = CreateTargetFrameworkInformation(
-                    new List<LibraryDependency>() { dependencyD }, // direct dependency
+                    [dependencyD], // direct dependency
                     new List<CentralPackageVersion>() { centralVersion2 },
                     framework);
 
@@ -3329,7 +3449,7 @@ namespace NuGet.Commands.Test.RestoreCommandTests
 
             var logger = new TestLogger();
 
-            // aCT
+            // Act
             var request = ProjectTestHelpers.CreateRestoreRequest(pathContext, logger, packageSpec);
             var restoreCommand = new RestoreCommand(request);
             RestoreResult result = await restoreCommand.ExecuteAsync();
@@ -3339,24 +3459,100 @@ namespace NuGet.Commands.Test.RestoreCommandTests
             result.LockFile.PackageSpec.RestoreMetadata.UseLegacyDependencyResolver.Should().BeTrue();
         }
 
-        private static TargetFrameworkInformation CreateTargetFrameworkInformation(List<LibraryDependency> dependencies, List<CentralPackageVersion> centralVersionsDependencies, NuGetFramework framework = null)
+        /// <summary>
+        /// Verifies that the <see cref="RestoreCommand.CreateFrameworkRuntimeDefinitions(PackageSpec, ISet{string})" /> method returns pairs with frameworks with no runtimes first, then pairs with frameworks and runtimes after.
+        /// </summary>
+        [Fact]
+        public void CreateFrameworkRuntimeDefinitions_ReturnsPairsInExpectedOrder()
+        {
+            // Arrange
+            using var pathContext = new SimpleTestPathContext();
+            var projectName = "TestProject";
+            PackageSpec packageSpec = ProjectTestHelpers.GetPackageSpec(projectName, pathContext.SolutionRoot, "net472");
+            packageSpec.TargetFrameworks.Add(new TargetFrameworkInformation { FrameworkName = FrameworkConstants.CommonFrameworks.Net80 });
+
+            HashSet<string> runtimeIds = new() { "win-x86", "win-x64" };
+
+            var logger = new TestLogger();
+
+            // Act
+            var request = ProjectTestHelpers.CreateRestoreRequest(pathContext, logger, packageSpec);
+            var pairs = RestoreCommand.CreateFrameworkRuntimeDefinitions(request.Project, runtimeIds).ToList();
+
+            // Assert
+            pairs[0].Framework.Should().Be(FrameworkConstants.CommonFrameworks.Net472);
+            pairs[0].RuntimeIdentifier.Should().BeEmpty();
+
+            pairs[1].Framework.Should().Be(FrameworkConstants.CommonFrameworks.Net80);
+            pairs[1].RuntimeIdentifier.Should().BeEmpty();
+
+            pairs[2].Framework.Should().Be(FrameworkConstants.CommonFrameworks.Net472);
+            pairs[2].RuntimeIdentifier.Should().Be("win-x86");
+
+            pairs[3].Framework.Should().Be(FrameworkConstants.CommonFrameworks.Net472);
+            pairs[3].RuntimeIdentifier.Should().Be("win-x64");
+
+            pairs[4].Framework.Should().Be(FrameworkConstants.CommonFrameworks.Net80);
+            pairs[4].RuntimeIdentifier.Should().Be("win-x86");
+
+            pairs[5].Framework.Should().Be(FrameworkConstants.CommonFrameworks.Net80);
+            pairs[5].RuntimeIdentifier.Should().Be("win-x64");
+        }
+
+        private static TargetFrameworkInformation CreateTargetFrameworkInformation(ImmutableArray<LibraryDependency> dependencies, List<CentralPackageVersion> centralVersionsDependencies, NuGetFramework framework = null)
         {
             NuGetFramework nugetFramework = framework ?? new NuGetFramework("net40");
+            var centralPackageVersions = centralVersionsDependencies.ToDictionary(e => e.Name, StringComparer.OrdinalIgnoreCase);
+            var newDependencies = ApplyCentralVersionInformation(dependencies, centralPackageVersions);
+
             TargetFrameworkInformation tfi = new TargetFrameworkInformation()
             {
                 AssetTargetFallback = true,
-                Warn = false,
+                CentralPackageVersions = centralPackageVersions,
+                Dependencies = newDependencies,
                 FrameworkName = nugetFramework,
-                Dependencies = dependencies,
+                Warn = false,
             };
 
-            foreach (var cvd in centralVersionsDependencies)
-            {
-                tfi.CentralPackageVersions.Add(cvd.Name, cvd);
-            }
-            LibraryDependency.ApplyCentralVersionInformation(tfi.Dependencies, tfi.CentralPackageVersions);
-
             return tfi;
+
+            static ImmutableArray<LibraryDependency> ApplyCentralVersionInformation(ImmutableArray<LibraryDependency> packageReferences, IReadOnlyDictionary<string, CentralPackageVersion> centralPackageVersions)
+            {
+                LibraryDependency[] result = new LibraryDependency[packageReferences.Length];
+                for (int i = 0; i < packageReferences.Length; i++)
+                {
+                    LibraryDependency d = packageReferences[i];
+                    if (!d.AutoReferenced && d.LibraryRange.VersionRange == null)
+                    {
+                        var libraryRange = d.LibraryRange;
+                        var versionCentrallyManaged = d.VersionCentrallyManaged;
+
+                        if (d.VersionOverride != null)
+                        {
+                            libraryRange = new LibraryRange(d.LibraryRange) { VersionRange = d.VersionOverride };
+                        }
+                        else
+                        {
+                            if (centralPackageVersions.TryGetValue(d.Name, out CentralPackageVersion centralPackageVersion))
+                            {
+                                libraryRange = new LibraryRange(d.LibraryRange) { VersionRange = centralPackageVersion.VersionRange };
+                            }
+
+                            versionCentrallyManaged = true;
+                        }
+
+                        d = new LibraryDependency(d)
+                        {
+                            LibraryRange = libraryRange,
+                            VersionCentrallyManaged = versionCentrallyManaged
+                        };
+                    }
+
+                    result[i] = d;
+                }
+
+                return ImmutableCollectionsMarshal.AsImmutableArray(result);
+            }
         }
 
         private static PackageSpec CreatePackageSpec(List<TargetFrameworkInformation> tfis, NuGetFramework framework, string projectName, string projectPath, bool centralPackageManagementEnabled, bool centralPackageTransitivePinningEnabled = false)

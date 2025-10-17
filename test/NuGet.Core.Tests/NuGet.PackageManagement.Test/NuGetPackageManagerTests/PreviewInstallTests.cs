@@ -1657,7 +1657,7 @@ namespace NuGet.PackageManagement.Test.NuGetPackageManagerTests
 
                 // Assert
                 Assert.Equal(4, nuGetProjectActions.Count);
-                var newtonsoftJsonAction = nuGetProjectActions.Where(a => a.PackageIdentity.Equals(newtonsoftJsonPackageIdentity)).FirstOrDefault();
+                var newtonsoftJsonAction = nuGetProjectActions.FirstOrDefault(a => a.PackageIdentity.Equals(newtonsoftJsonPackageIdentity));
 
                 Assert.NotNull(newtonsoftJsonAction);
             }
@@ -1702,7 +1702,7 @@ namespace NuGet.PackageManagement.Test.NuGetPackageManagerTests
                 Assert.Equal(newtonsoftJsonPackageIdentity, packagesInPackagesConfig[0].PackageIdentity);
                 Assert.Equal(msBuildNuGetProject.ProjectSystem.TargetFramework, packagesInPackagesConfig[0].TargetFramework);
                 var installedPackages = await msBuildNuGetProject.GetInstalledPackagesAsync(token);
-                var newtonsoftJsonPackageReference = installedPackages.Where(pr => pr.PackageIdentity.Equals(newtonsoftJsonPackageIdentity)).FirstOrDefault();
+                var newtonsoftJsonPackageReference = installedPackages.FirstOrDefault(pr => pr.PackageIdentity.Equals(newtonsoftJsonPackageIdentity));
 
                 Assert.Null(newtonsoftJsonPackageReference.AllowedVersions);
 
@@ -1721,7 +1721,7 @@ namespace NuGet.PackageManagement.Test.NuGetPackageManagerTests
                 Assert.Equal(newtonsoftJsonPackageIdentity, packagesInPackagesConfig[0].PackageIdentity);
                 Assert.Equal(msBuildNuGetProject.ProjectSystem.TargetFramework, packagesInPackagesConfig[0].TargetFramework);
                 installedPackages = await msBuildNuGetProject.GetInstalledPackagesAsync(token);
-                newtonsoftJsonPackageReference = installedPackages.Where(pr => pr.PackageIdentity.Equals(newtonsoftJsonPackageIdentity)).FirstOrDefault();
+                newtonsoftJsonPackageReference = installedPackages.FirstOrDefault(pr => pr.PackageIdentity.Equals(newtonsoftJsonPackageIdentity));
 
                 Assert.NotNull(newtonsoftJsonPackageReference.AllowedVersions);
 
@@ -1789,7 +1789,7 @@ namespace NuGet.PackageManagement.Test.NuGetPackageManagerTests
             Assert.Equal(2, packagesInPackagesConfig.Count);
             Assert.Contains(packagesInPackagesConfig, pr => pr.PackageIdentity.Equals(newtonsoftJsonPackageIdentity) && pr.TargetFramework == msBuildNuGetProject.ProjectSystem.TargetFramework);
             var installedPackages = await msBuildNuGetProject.GetInstalledPackagesAsync(token);
-            var newtonsoftJsonPackageReference = installedPackages.Where(pr => pr.PackageIdentity.Equals(newtonsoftJsonPackageIdentity)).FirstOrDefault();
+            var newtonsoftJsonPackageReference = installedPackages.FirstOrDefault(pr => pr.PackageIdentity.Equals(newtonsoftJsonPackageIdentity));
 
             Assert.Null(newtonsoftJsonPackageReference.AllowedVersions);
 
@@ -1808,7 +1808,7 @@ namespace NuGet.PackageManagement.Test.NuGetPackageManagerTests
             Assert.Equal(2, packagesInPackagesConfig.Count);
             Assert.Contains(packagesInPackagesConfig, pr => pr.PackageIdentity.Equals(newtonsoftJsonPackageIdentity) && pr.TargetFramework == msBuildNuGetProject.ProjectSystem.TargetFramework);
             installedPackages = await msBuildNuGetProject.GetInstalledPackagesAsync(token);
-            newtonsoftJsonPackageReference = installedPackages.Where(pr => pr.PackageIdentity.Equals(newtonsoftJsonPackageIdentity)).FirstOrDefault();
+            newtonsoftJsonPackageReference = installedPackages.FirstOrDefault(pr => pr.PackageIdentity.Equals(newtonsoftJsonPackageIdentity));
 
             Assert.NotNull(newtonsoftJsonPackageReference.AllowedVersions);
 
@@ -1874,7 +1874,7 @@ namespace NuGet.PackageManagement.Test.NuGetPackageManagerTests
             Assert.Equal(2, packagesInPackagesConfig.Count);
             Assert.Contains(packagesInPackagesConfig, pr => pr.PackageIdentity.Equals(newJsonPackageIdentity) && pr.TargetFramework == msBuildNuGetProject.ProjectSystem.TargetFramework);
             var installedPackages = await msBuildNuGetProject.GetInstalledPackagesAsync(token);
-            var newtonsoftJsonPackageReference = installedPackages.Where(pr => pr.PackageIdentity.Equals(newJsonPackageIdentity)).FirstOrDefault();
+            var newtonsoftJsonPackageReference = installedPackages.FirstOrDefault(pr => pr.PackageIdentity.Equals(newJsonPackageIdentity));
 
             Assert.Null(newtonsoftJsonPackageReference.AllowedVersions);
 
@@ -1893,7 +1893,7 @@ namespace NuGet.PackageManagement.Test.NuGetPackageManagerTests
             Assert.Equal(2, packagesInPackagesConfig.Count);
             Assert.Contains(packagesInPackagesConfig, pr => pr.PackageIdentity.Equals(newJsonPackageIdentity) && pr.TargetFramework == msBuildNuGetProject.ProjectSystem.TargetFramework);
             installedPackages = await msBuildNuGetProject.GetInstalledPackagesAsync(token);
-            newtonsoftJsonPackageReference = installedPackages.Where(pr => pr.PackageIdentity.Equals(newJsonPackageIdentity)).FirstOrDefault();
+            newtonsoftJsonPackageReference = installedPackages.FirstOrDefault(pr => pr.PackageIdentity.Equals(newJsonPackageIdentity));
 
             Assert.NotNull(newtonsoftJsonPackageReference.AllowedVersions);
 
@@ -2125,7 +2125,7 @@ namespace NuGet.PackageManagement.Test.NuGetPackageManagerTests
                         new PackageSource(packageSource1.Path)
                     });
 
-                using (var testSolutionManager = new TestSolutionManager())
+                using (var testSolutionManager = new TestVSSolutionManager())
                 {
                     var testSettings = NullSettings.Instance;
                     var token = CancellationToken.None;
@@ -2237,7 +2237,7 @@ namespace NuGet.PackageManagement.Test.NuGetPackageManagerTests
             var nugetProjectContext = new TestNuGetProjectContext();
 
             // Create Package Manager
-            using (var solutionManager = new TestSolutionManager())
+            using (var solutionManager = new TestVSSolutionManager())
             {
                 var nuGetPackageManager = new NuGetPackageManager(
                     sourceRepositoryProvider,
@@ -2367,18 +2367,20 @@ namespace NuGet.PackageManagement.Test.NuGetPackageManagerTests
 
             var json = new JObject
             {
-                ["dependencies"] = new JObject()
-                    {
-                        new JProperty("a", "1.0.0")
-                    },
                 ["frameworks"] = new JObject
                 {
                     ["net45"] = new JObject()
+                    {
+                        ["dependencies"] = new JObject()
+                        {
+                            new JProperty("a", "1.0.0")
+                        },
+                    }
                 }
             };
 
             // Create Package Manager
-            using (var solutionManager = new TestSolutionManager())
+            using (var solutionManager = new TestVSSolutionManager())
             {
                 var nuGetPackageManager = new NuGetPackageManager(
                     sourceRepositoryProvider,
@@ -2428,18 +2430,20 @@ namespace NuGet.PackageManagement.Test.NuGetPackageManagerTests
 
             var json = new JObject
             {
-                ["dependencies"] = new JObject()
-                    {
-                        new JProperty("a", "1.0.0")
-                    },
                 ["frameworks"] = new JObject
                 {
                     ["net45"] = new JObject()
+                    {
+                        ["dependencies"] = new JObject()
+                        {
+                            new JProperty("a", "1.0.0")
+                        }
+                    }
                 }
             };
 
             // Create Package Manager
-            using (var solutionManager = new TestSolutionManager())
+            using (var solutionManager = new TestVSSolutionManager())
             {
                 var nuGetPackageManager = new NuGetPackageManager(
                     sourceRepositoryProvider,

@@ -352,6 +352,7 @@ namespace NuGet.CommandLine
             var repositories = packageSources
                 .Select(sourceRepositoryProvider.CreateRepository)
                 .ToList();
+            var auditSources = GetAuditSources(SourceProvider);
 
             if (!areAnyPackagesMissing)
             {
@@ -371,8 +372,6 @@ namespace NuGet.CommandLine
                     restoreSummaries);
 
                 using SourceCacheContext cacheContext = new();
-
-                var auditSources = GetAuditSources();
 
                 var auditUtility = new AuditChecker(
                     repositories,
@@ -401,6 +400,7 @@ namespace NuGet.CommandLine
                 packageRestoredEvent: (sender, args) => { Interlocked.Add(ref installCount, args.Restored ? 1 : 0); },
                 packageRestoreFailedEvent: (sender, args) => { failedEvents.Enqueue(args); },
                 sourceRepositories: repositories,
+                auditSources: auditSources,
                 maxNumberOfParallelTasks: DisableParallelProcessing
                         ? 1
                         : PackageManagementConstants.DefaultMaxDegreeOfParallelism,
@@ -472,9 +472,9 @@ namespace NuGet.CommandLine
             }
         }
 
-        private List<SourceRepository> GetAuditSources()
+        internal static List<SourceRepository> GetAuditSources(IPackageSourceProvider sourceProvider)
         {
-            IReadOnlyList<PackageSource> auditSources = SourceProvider.LoadAuditSources();
+            IReadOnlyList<PackageSource> auditSources = sourceProvider.LoadAuditSources();
 
             List<SourceRepository> auditRepositories = new List<SourceRepository>(auditSources.Count);
             for (int i = 0; i < auditSources.Count; i++)
@@ -681,8 +681,8 @@ namespace NuGet.CommandLine
                     Console.LogDebug(ex.ToString());
 
                     // Check for packages.config but no project.json files
-                    if (projectsWithPotentialP2PReferences.Where(HasPackagesConfigFile).Any()
-                        && !projectsWithPotentialP2PReferences.Where(HasProjectJsonFile).Any())
+                    if (projectsWithPotentialP2PReferences.Any(HasPackagesConfigFile)
+                        && !projectsWithPotentialP2PReferences.Any(HasProjectJsonFile))
                     {
                         // warn to let the user know that NETCore will be skipped
                         Console.LogWarning(LocalizedResourceManager.GetString("Warning_ReadingProjectsFailed"));
@@ -834,8 +834,7 @@ namespace NuGet.CommandLine
             {
                 packageRestoreInputs.RestoreV3Context.Inputs.Add(projectFilePath);
             }
-            else if (projectFileName.EndsWith(".sln", StringComparison.OrdinalIgnoreCase)
-                || projectFileName.EndsWith(".slnf", StringComparison.OrdinalIgnoreCase))
+            else if (projectFileName.IsSolutionFile())
             {
                 ProcessSolutionFile(projectFilePath, packageRestoreInputs);
             }
@@ -859,9 +858,7 @@ namespace NuGet.CommandLine
             var topLevelFiles = Directory.GetFiles(directory, "*.*", SearchOption.TopDirectoryOnly);
 
             //  Solution files
-            var solutionFiles = topLevelFiles.Where(file =>
-                file.EndsWith(".sln", StringComparison.OrdinalIgnoreCase))
-                    .ToArray();
+            var solutionFiles = topLevelFiles.Where(file => file.IsSolutionFile()).ToArray();
 
             if (solutionFiles.Length > 0)
             {
@@ -910,25 +907,6 @@ namespace NuGet.CommandLine
                     directory);
 
             throw new InvalidOperationException(noInputs);
-        }
-
-        private static bool IsSolutionOrProjectFile(string fileName)
-        {
-            if (!string.IsNullOrEmpty(fileName))
-            {
-                var extension = Path.GetExtension(fileName);
-                var lastFourCharacters = string.Empty;
-                var length = extension.Length;
-
-                if (length >= 4)
-                {
-                    lastFourCharacters = extension.Substring(length - 4);
-                }
-
-                return (string.Equals(extension, ".sln", StringComparison.OrdinalIgnoreCase)
-                        || string.Equals(lastFourCharacters, "proj", StringComparison.OrdinalIgnoreCase));
-            }
-            return false;
         }
 
         /// <summary>
@@ -998,6 +976,16 @@ namespace NuGet.CommandLine
 
         private void ProcessSolutionFile(string solutionFileFullPath, PackageRestoreInputs restoreInputs)
         {
+            var msBuildToolset = MsBuildDirectory.Value;
+            if (Path.GetExtension(solutionFileFullPath).Equals(".slnx", StringComparison.OrdinalIgnoreCase)
+                && msBuildToolset.ParsedVersion < new Version(17, 13))
+            {
+                throw new InvalidOperationException(string.Format(
+                    CultureInfo.InvariantCulture,
+                    LocalizedResourceManager.GetString(nameof(NuGetResources.Error_UnsupportedMsBuildForSlnx)),
+                    msBuildToolset.Version));
+            }
+
             restoreInputs.DirectoryOfSolutionFile = Path.GetDirectoryName(solutionFileFullPath);
             restoreInputs.NameOfSolutionFile = Path.GetFileNameWithoutExtension(solutionFileFullPath);
 

@@ -1,5 +1,8 @@
 # Contributing
 
+This repo's official location is <https://github.com/NuGet/NuGet.Client>.
+The NuGet team does not accept pull requests in other locations, but security issues must follow the [security process](SECURITY.md).
+
 This project welcomes contributions and suggestions.
 Most contributions require you to agree to a Contributor License Agreement (CLA) declaring that you have the right to, and actually do, grant us the rights to use your contribution.
 For details, visit https://cla.dotnetfoundation.org/.
@@ -79,11 +82,11 @@ NuGet members may contribute directly to the main remote.
 
 1. Build with
 
-    `.\build.ps1 -SkipUnitTest`
+    `.\build.ps1`
 
    Or Build and Unit test with
 
-   `.\build.ps1`
+   `.\build.ps1 -RunUnitTests`
 
     > Note: You have to to run .\configure.ps1 and .\build.ps1 at least once in order for your build to succeed.
 
@@ -104,8 +107,8 @@ NuGet members may contribute directly to the main remote.
 
 ### Notable `build.ps1` switches
 
-- `-SkipUnitTest` - skips running unit tests.
-- `-Fast` - runs minimal incremental build. Skips end-to-end packaging step.
+- `-RunUnitTests` - Runs unit tests after building.
+- `-Clean` - cleans build artifacts without deleting files that configure.ps1 creates.
 
 > Reveal all script parameters and switches by running
   Get-Help .\build.ps1 -detailed

@@ -22,7 +22,6 @@ namespace NuGet.Tests.Apex.NuGetEndToEndTests
     {
         private const string TestPackageName = "Contoso.A";
         private const string TestPackageVersionV1 = "1.0.0";
-        private const string TestPackageVersionV2 = "2.0.0";
 
         [TestMethod]
         [Timeout(DefaultTimeout)]
@@ -56,8 +55,6 @@ namespace NuGet.Tests.Apex.NuGetEndToEndTests
             mockServer.Start();
 
             testPathContext.Settings.AddSource("auditSource", mockServer.ServiceIndexUri, allowInsecureConnectionsValue: "true");
-
-            EnsureVisualStudioHost();
 
             using var testContext = new ApexTestContext(VisualStudio, ProjectTemplate.ConsoleApplication, Logger, addNetStandardFeeds: true, simpleTestPathContext: testPathContext);
 

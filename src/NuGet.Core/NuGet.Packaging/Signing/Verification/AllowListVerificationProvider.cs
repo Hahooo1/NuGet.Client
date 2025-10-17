@@ -5,11 +5,8 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
-
-#if IS_SIGNING_SUPPORTED
 using System.Linq;
 using NuGet.Common;
-#endif
 
 namespace NuGet.Packaging.Signing
 {
@@ -34,7 +31,6 @@ namespace NuGet.Packaging.Signing
             return Task.FromResult(VerifyAllowList(package, signature, settings));
         }
 
-#if IS_SIGNING_SUPPORTED
         private PackageVerificationResult VerifyAllowList(ISignedPackageReader package, PrimarySignature signature, SignedPackageVerifierSettings settings)
         {
             var treatIssuesAsErrors = !settings.AllowUntrusted;
@@ -114,7 +110,7 @@ namespace NuGet.Packaging.Signing
                             if (IsSignatureTargeted(certificateHashEntry.Target, repositoryCountersignature.Value) &&
                                 StringComparer.OrdinalIgnoreCase.Equals(certificateHashEntry.Fingerprint, countersignatureCertificateFingerprint))
                             {
-                                if (ShouldVerifyOwners(certificateHashEntry as TrustedSignerAllowListEntry, repositoryCountersignature.Value as IRepositorySignature, out var allowedOwners, out var actualOwners))
+                                if (ShouldVerifyOwners(certificateHashEntry as TrustedSignerAllowListEntry, repositoryCountersignature.Value, out var allowedOwners, out var actualOwners))
                                 {
                                     if (allowedOwners.Intersect(actualOwners).Any())
                                     {
@@ -170,12 +166,5 @@ namespace NuGet.Packaging.Signing
 
             return fingerprintString;
         }
-
-#else
-        private PackageVerificationResult VerifyAllowList(ISignedPackageReader package, PrimarySignature signature, SignedPackageVerifierSettings settings)
-        {
-            throw new NotSupportedException();
-        }
-#endif
     }
 }

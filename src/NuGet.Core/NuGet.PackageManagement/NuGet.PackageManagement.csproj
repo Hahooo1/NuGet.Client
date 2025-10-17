@@ -22,12 +22,13 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.Web.Xdt" />
-    <PackageReference Include="Microsoft.CSharp" />
+    <PackageReference Include="Microsoft.CSharp" Condition="'$(TargetFrameworkIdentifier)' == '.NETStandard'" />
   </ItemGroup>
 
   <ItemGroup Condition=" '$(TargetFramework)' == '$(NETFXTargetFramework)' ">
     <Reference Include="System.ComponentModel.Composition" />
     <Reference Include="Microsoft.Build" />
+    <Reference Include="Microsoft.CSharp" />
     <Reference Include="System.IO.Compression" />
     <Reference Include="System.Net.Http" />
   </ItemGroup>
@@ -65,6 +66,7 @@
   <ItemGroup>
     <InternalsVisibleTo Include="DynamicProxyGenAssembly2" />
     <InternalsVisibleTo Include="NuGet.PackageManagement.Test" />
+    <InternalsVisibleTo Include="NuGet.PackageManagement.VisualStudio.Test" />
     <InternalsVisibleTo Include="NuGet.SolutionRestoreManager.Test" />
   </ItemGroup>
 </Project>

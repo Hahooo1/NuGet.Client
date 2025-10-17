@@ -1,6 +1,8 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
+using System;
+
 namespace NuGet.Common
 {
     /// <summary>
@@ -41,7 +43,7 @@ namespace NuGet.Common
     /// </para>
     ///
     /// <para>
-    /// All new codes need a corresponding MarkDown file under https://github.com/NuGet/docs.microsoft.com-nuget/tree/master/docs/reference/errors-and-warnings.
+    /// All new codes need a corresponding MarkDown file under https://github.com/NuGet/docs.microsoft.com-nuget/tree/main/docs/reference/errors-and-warnings.
     /// </para>
     /// </remarks>
     public enum NuGetLogCode
@@ -127,6 +129,21 @@ namespace NuGet.Common
         NU1014 = 1014,
 
         /// <summary>
+        /// PackageReference without a version.
+        /// </summary>
+        NU1015 = 1015,
+
+        /// <summary>
+        /// The project.json project type is not supported.
+        /// </summary>
+        NU1016 = 1016,
+
+        /// <summary>
+        /// Invalid package Id.
+        /// </summary>
+        NU1017 = 1017,
+
+        /// <summary>
         /// Unable to resolve package, generic message for unknown type constraints.
         /// </summary>
         NU1100 = 1100,
@@ -200,11 +217,13 @@ namespace NuGet.Common
         /// <summary>
         /// Invalid package types
         /// </summary>
+        [Obsolete]
         NU1204 = 1204,
 
         /// <summary>
         /// Project has an invalid dependency count
         /// </summary>
+        [Obsolete]
         NU1211 = 1211,
 
         /// <summary>
@@ -291,6 +310,21 @@ namespace NuGet.Common
         /// Duplicate NuGetAuditSuppress found
         /// </summary>
         NU1508 = 1508,
+
+        /// <summary>
+        /// Duplicate PrunedPackageReference found
+        /// </summary>
+        NU1509 = 1509,
+
+        /// <summary>
+        /// Direct reference to a package that will not be pruned.
+        /// </summary>
+        NU1510 = 1510,
+
+        /// <summary>
+        /// Project references cannot be pruned
+        /// </summary>
+        NU1511 = 1511,
 
         /// <summary>
         /// Dependency bumped up
@@ -685,6 +719,7 @@ namespace NuGet.Common
         /// <summary>
         /// Error_MultipleTargetFrameworks
         /// </summary>
+        [Obsolete]
         NU5015 = 5015,
 
         /// <summary>
@@ -983,7 +1018,7 @@ namespace NuGet.Common
         NU5126 = 5126,
 
         /// <summary>
-        /// No ref or lib folder in the package
+        /// TFM specific build files, but no ref or lib folder in the package
         /// </summary>
         NU5127 = 5127,
 

@@ -384,9 +384,9 @@ namespace NuGet.Test
 
                 restoreFailedPackages.Select(i => i.Key.PackageIdentity).Should().BeEquivalentTo(new[] { testPackage1, testPackage2 });
 
-                restoreFailedPackages[restoreFailedPackages.Keys.Where(r => r.PackageIdentity.Equals(testPackage1)).First()].Should().BeEquivalentTo(new[] { "projectB", "projectC" });
+                restoreFailedPackages[restoreFailedPackages.Keys.First(r => r.PackageIdentity.Equals(testPackage1))].Should().BeEquivalentTo(new[] { "projectB", "projectC" });
 
-                restoreFailedPackages[restoreFailedPackages.Keys.Where(r => r.PackageIdentity.Equals(testPackage2)).First()].Should().BeEquivalentTo(new[] { "projectA", "projectC" });
+                restoreFailedPackages[restoreFailedPackages.Keys.First(r => r.PackageIdentity.Equals(testPackage2))].Should().BeEquivalentTo(new[] { "projectA", "projectC" });
             }
         }
 
@@ -438,6 +438,41 @@ namespace NuGet.Test
             // Assert
             result.Should().NotBeNull();
             nuGetPackageManager.PackageExistsInPackagesFolder((packageA.Identity)).Should().BeTrue();
+        }
+
+        [Fact]
+        public async Task RestoreMissingPackagesInSolutionAsync_WhenNoPackageReferences_ReturnsNoopRestoreResult()
+        {
+            // Arrange
+            using var testSolutionManager = new TestSolutionManager();
+
+            // Create an empty solution with no packages
+            testSolutionManager.AddNewMSBuildProject(); // Add a project with no packages
+
+            using var simpleTestPathContext = new SimpleTestPathContext();
+            var sourceRepositoryProvider = TestSourceRepositoryUtility.CreateSourceRepositoryProvider(new PackageSource(simpleTestPathContext.PackageSource));
+            var testSettings = Configuration.NullSettings.Instance;
+            var packageRestoreManager = new PackageRestoreManager(
+                sourceRepositoryProvider,
+                testSettings,
+                testSolutionManager);
+
+            var testNuGetProjectContext = new TestNuGetProjectContext();
+            var logger = new TestLogger();
+            var token = CancellationToken.None;
+
+            // Act
+            var result = await packageRestoreManager.RestoreMissingPackagesInSolutionAsync(
+                testSolutionManager.SolutionDirectory,
+                testNuGetProjectContext,
+                logger,
+                token);
+
+            // Assert
+            result.Should().NotBeNull();
+            result.Should().BeSameAs(PackageRestoreResult.NoopRestoreResult);
+            result.Restored.Should().BeFalse();
+            result.RestoredPackages.Should().BeEmpty();
         }
 
         private static DownloadResourceResult GetDownloadResult(string source, FileInfo packageFileInfo)

@@ -3,7 +3,9 @@
 
 using System;
 using System.CommandLine;
+using System.Threading.Tasks;
 using FluentAssertions;
+using NuGet.CommandLine.XPlat.Commands;
 using NuGet.CommandLine.XPlat.Commands.Why;
 using Xunit;
 
@@ -12,10 +14,24 @@ namespace NuGet.CommandLine.Xplat.Tests.Commands.Why
     public class WhyCommandLineParsingTests
     {
         [Fact]
+        public void WhyCommand_HasHelpUrl()
+        {
+            // Arrange
+            Command rootCommand = new("nuget");
+
+            // Act
+            WhyCommand.Register(rootCommand, NullLoggerWithColor.GetInstance);
+
+            // Assert
+            rootCommand.Subcommands[0].Should().BeAssignableTo<DocumentedCommand>();
+            ((DocumentedCommand)rootCommand.Subcommands[0]).HelpUrl.Should().NotBeNullOrEmpty();
+        }
+
+        [Fact]
         public void WithTwoArguments_PathAndPackageAreSet()
         {
             // Arrange
-            CliCommand rootCommand = new("nuget");
+            Command rootCommand = new("nuget");
 
             WhyCommand.Register(rootCommand, NullLoggerWithColor.GetInstance, whyCommandArgs =>
             {
@@ -23,7 +39,7 @@ namespace NuGet.CommandLine.Xplat.Tests.Commands.Why
                 whyCommandArgs.Path.Should().Be(@"path\to\my.proj");
                 whyCommandArgs.Package.Should().Be("packageid");
                 whyCommandArgs.Frameworks.Should().BeNullOrEmpty();
-                return 0;
+                return Task.FromResult(0);
             });
 
             // Act
@@ -36,7 +52,7 @@ namespace NuGet.CommandLine.Xplat.Tests.Commands.Why
         public void WithOneArguments_PackageIsSet()
         {
             // Arrange
-            CliCommand rootCommand = new("nuget");
+            Command rootCommand = new("nuget");
 
             WhyCommand.Register(rootCommand, NullLoggerWithColor.GetInstance, whyCommandArgs =>
             {
@@ -44,7 +60,7 @@ namespace NuGet.CommandLine.Xplat.Tests.Commands.Why
                 whyCommandArgs.Path.Should().NotBeNull();
                 whyCommandArgs.Package.Should().Be("packageid");
                 whyCommandArgs.Frameworks.Should().BeNullOrEmpty();
-                return 0;
+                return Task.FromResult(0);
             });
 
             // Act
@@ -57,7 +73,7 @@ namespace NuGet.CommandLine.Xplat.Tests.Commands.Why
         public void WithZeroArguments_HasParseError()
         {
             // Arrange
-            CliCommand rootCommand = new("nuget");
+            Command rootCommand = new("nuget");
 
             WhyCommand.Register(rootCommand, NullLoggerWithColor.GetInstance, whyCommandArgs =>
             {
@@ -74,7 +90,7 @@ namespace NuGet.CommandLine.Xplat.Tests.Commands.Why
         public void WithThreeArguments_HasParseError()
         {
             // Arrange
-            CliCommand rootCommand = new("nuget");
+            Command rootCommand = new("nuget");
 
             WhyCommand.Register(rootCommand, NullLoggerWithColor.GetInstance, whyCommandArgs =>
             {
@@ -94,7 +110,7 @@ namespace NuGet.CommandLine.Xplat.Tests.Commands.Why
         public void FrameworkOption_CanBeAtAnyPosition(string args)
         {
             // Arrange
-            CliCommand rootCommand = new("nuget");
+            Command rootCommand = new("nuget");
 
             WhyCommand.Register(rootCommand, NullLoggerWithColor.GetInstance, whyCommandArgs =>
             {
@@ -102,7 +118,7 @@ namespace NuGet.CommandLine.Xplat.Tests.Commands.Why
                 whyCommandArgs.Path.Should().Be("my.proj");
                 whyCommandArgs.Package.Should().Be("packageid");
                 whyCommandArgs.Frameworks.Should().Equal(["net8.0"]);
-                return 0;
+                return Task.FromResult(0);
             });
 
             // Act
@@ -117,7 +133,7 @@ namespace NuGet.CommandLine.Xplat.Tests.Commands.Why
         public void FrameworkOption_CanBeLongOrShortForm(string arg)
         {
             // Arrange
-            CliCommand rootCommand = new("nuget");
+            Command rootCommand = new("nuget");
 
             WhyCommand.Register(rootCommand, NullLoggerWithColor.GetInstance, whyCommandArgs =>
             {
@@ -125,7 +141,7 @@ namespace NuGet.CommandLine.Xplat.Tests.Commands.Why
                 whyCommandArgs.Path.Should().Be("my.proj");
                 whyCommandArgs.Package.Should().Be("packageid");
                 whyCommandArgs.Frameworks.Should().Equal(["net8.0"]);
-                return 0;
+                return Task.FromResult(0);
             });
 
             // Act
@@ -138,7 +154,7 @@ namespace NuGet.CommandLine.Xplat.Tests.Commands.Why
         public void FrameworkOption_AcceptsMultipleValues()
         {
             // Arrange
-            CliCommand rootCommand = new("nuget");
+            Command rootCommand = new("nuget");
 
             WhyCommand.Register(rootCommand, NullLoggerWithColor.GetInstance, whyCommandArgs =>
             {
@@ -146,7 +162,7 @@ namespace NuGet.CommandLine.Xplat.Tests.Commands.Why
                 whyCommandArgs.Path.Should().Be("my.proj");
                 whyCommandArgs.Package.Should().Be("packageid");
                 whyCommandArgs.Frameworks.Should().Equal(["net8.0", "net481"]);
-                return 0;
+                return Task.FromResult(0);
             });
 
             // Act
@@ -159,7 +175,7 @@ namespace NuGet.CommandLine.Xplat.Tests.Commands.Why
         public void HelpOption_ShowsHelp()
         {
             // Arrange
-            CliCommand rootCommand = new("nuget");
+            Command rootCommand = new("nuget");
 
             WhyCommand.Register(rootCommand, NullLoggerWithColor.GetInstance, whyCommandArgs =>
             {
@@ -167,7 +183,7 @@ namespace NuGet.CommandLine.Xplat.Tests.Commands.Why
                 whyCommandArgs.Path.Should().Be("my.proj");
                 whyCommandArgs.Package.Should().Be("packageid");
                 whyCommandArgs.Frameworks.Should().Equal(["net8.0", "net481"]);
-                return 0;
+                return Task.FromResult(0);
             });
 
             // Act

@@ -258,8 +258,8 @@ namespace NuGet.Commands.Test.RestoreCommandTests
             target.ConvertLockFileToOriginalCase(lockFile);
 
             // Assert
-            Assert.Equal("PackageA/1.0.0-Beta", packageLibrary.Path);
-            Assert.Equal("project", projectLibrary.Path);
+            Assert.Equal("PackageA/1.0.0-Beta", lockFile.Libraries.First(l => l.Name == packageLibrary.Name).Path);
+            Assert.Equal("project", lockFile.Libraries.First(l => l.Name == projectLibrary.Name).Path);
         }
 
         private static RestoreRequest GetRestoreRequest(string packagesDirectory, TestLogger logger, params string[] fallbackDirectories)
@@ -267,7 +267,7 @@ namespace NuGet.Commands.Test.RestoreCommandTests
             using (var testDirectory = TestDirectory.Create())
             {
                 return new TestRestoreRequest(
-                    new PackageSpec() { FilePath = testDirectory.Path + "a.csproj" }.EnsureProjectJsonRestoreMetadata(),
+                    new PackageSpec() { FilePath = testDirectory.Path + "a.csproj" }.WithTestRestoreMetadata(),
                     Enumerable.Empty<PackageSource>(),
                     packagesDirectory,
                     fallbackDirectories,
@@ -327,6 +327,7 @@ namespace NuGet.Commands.Test.RestoreCommandTests
                 },
                 new TestRemoteWalkContext(),
                 logger,
+                FrameworkConstants.CommonFrameworks.NetStandard16.GetShortFolderName(),
                 FrameworkConstants.CommonFrameworks.NetStandard16);
 
             return graph;

@@ -3,6 +3,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Globalization;
 using System.Linq;
 using NuGet.Common;
@@ -33,21 +34,6 @@ namespace NuGet.Commands
             _includeFlagGraphs = includeFlagGraphs;
         }
 
-        [Obsolete("Use method with LockFileBuilderCache parameter")]
-        public LockFile CreateLockFile(LockFile previousLockFile,
-            PackageSpec project,
-            IEnumerable<RestoreTargetGraph> targetGraphs,
-            IReadOnlyList<NuGetv3LocalRepository> localRepositories,
-            RemoteWalkContext context)
-        {
-            return CreateLockFile(previousLockFile,
-                project,
-                targetGraphs,
-                localRepositories,
-                context,
-                new LockFileBuilderCache());
-        }
-
         public LockFile CreateLockFile(LockFile previousLockFile,
             PackageSpec project,
             IEnumerable<RestoreTargetGraph> targetGraphs,
@@ -62,8 +48,7 @@ namespace NuGet.Commands
 
             var previousLibraries = previousLockFile?.Libraries.ToDictionary(l => ValueTuple.Create(l.Name, l.Version));
 
-            if (project.RestoreMetadata?.ProjectStyle == ProjectStyle.PackageReference ||
-                project.RestoreMetadata?.ProjectStyle == ProjectStyle.DotnetToolReference)
+            if (project.RestoreMetadata?.ProjectStyle == ProjectStyle.PackageReference)
             {
                 AddProjectFileDependenciesForPackageReference(project, lockFile, targetGraphs);
             }
@@ -91,19 +76,14 @@ namespace NuGet.Commands
                 {
                     // Project
                     var localMatch = (LocalMatch)item.Data.Match;
-
-                    var projectLib = new LockFileLibrary()
-                    {
-                        Name = library.Name,
-                        Version = library.Version,
-                        Type = LibraryType.Project,
-                    };
+                    string path = null;
+                    string msBuildProject = null;
 
                     // Set the relative path if a path exists
                     // For projects without project.json this will be empty
                     if (!string.IsNullOrEmpty(localMatch.LocalLibrary.Path))
                     {
-                        projectLib.Path = PathUtility.GetRelativePath(
+                        path = PathUtility.GetRelativePath(
                             project.FilePath,
                             localMatch.LocalLibrary.Path,
                             '/');
@@ -118,8 +98,17 @@ namespace NuGet.Commands
                             (string)msbuildPath,
                             '/');
 
-                        projectLib.MSBuildProject = msbuildRelativePath;
+                        msBuildProject = msbuildRelativePath;
                     }
+
+                    var projectLib = new LockFileLibrary()
+                    {
+                        MSBuildProject = msBuildProject,
+                        Name = library.Name,
+                        Path = path,
+                        Version = library.Version,
+                        Type = LibraryType.Project,
+                    };
 
                     lockFile.Libraries.Add(projectLib);
                 }
@@ -146,10 +135,9 @@ namespace NuGet.Commands
                                 && StringComparer.Ordinal.Equals(path, previousLibrary.Path)
                                 && StringComparer.Ordinal.Equals(sha512, previousLibrary.Sha512))
                             {
-                                // We mutate this previous library so we must take a clone of it. This is
-                                // important because later, when deciding whether the lock file has changed,
+                                // When deciding whether the lock file has changed,
                                 // we compare the new lock file to the previous (in-memory) lock file.
-                                lockFileLib = previousLibrary.Clone();
+                                lockFileLib = previousLibrary;
                             }
                         }
 
@@ -179,7 +167,8 @@ namespace NuGet.Commands
                 var target = new LockFileTarget
                 {
                     TargetFramework = targetGraph.Framework,
-                    RuntimeIdentifier = targetGraph.RuntimeIdentifier
+                    RuntimeIdentifier = targetGraph.RuntimeIdentifier,
+                    TargetAlias = targetGraph.TargetAlias,
                 };
 
                 var flattenedFlags = IncludeFlagUtils.FlattenDependencyTypes(_includeFlagGraphs, project, targetGraph);
@@ -404,13 +393,6 @@ namespace NuGet.Commands
 
         private static void AddProjectFileDependenciesForSpec(PackageSpec project, LockFile lockFile)
         {
-            // Use empty string as the key of dependencies shared by all frameworks
-            lockFile.ProjectFileDependencyGroups.Add(new ProjectFileDependencyGroup(
-                string.Empty,
-                project.Dependencies
-                    .Select(group => group.LibraryRange.ToLockFileDependencyGroupString())
-                    .OrderBy(group => group, StringComparer.Ordinal)));
-
             foreach (var frameworkInfo in project.TargetFrameworks
                 .OrderBy(framework => framework.FrameworkName.ToString(),
                     StringComparer.Ordinal))
@@ -432,7 +414,6 @@ namespace NuGet.Commands
                     StringComparer.Ordinal))
             {
                 var dependencies = new List<LibraryRange>();
-                dependencies.AddRange(project.Dependencies.Select(e => e.LibraryRange));
                 dependencies.AddRange(frameworkInfo.Dependencies.Select(e => e.LibraryRange));
 
                 var targetGraph = targetGraphs.SingleOrDefault(graph =>
@@ -549,7 +530,7 @@ namespace NuGet.Commands
                     // If all assets are suppressed then the dependency should not be added
                     if (suppressParent != LibraryIncludeFlags.All)
                     {
-                        yield return new LibraryDependency(noWarn: Array.Empty<NuGetLogCode>())
+                        yield return new LibraryDependency()
                         {
                             LibraryRange = new LibraryRange(centralPackageVersion.Name, centralPackageVersion.VersionRange, LibraryDependencyTarget.Package),
                             ReferenceType = LibraryDependencyReferenceType.Transitive,
@@ -615,8 +596,25 @@ namespace NuGet.Commands
 
         internal static LockFileLibrary CreateLockFileLibrary(LocalPackageInfo package, string sha512, string path)
         {
+            var hasTools = false;
+
+            // Use for loop to avoid boxing enumerator
+            for (var i = 0; i < package.Files.Count; i++)
+            {
+                if (HasTools(package.Files[i]))
+                {
+                    hasTools = true;
+                    break;
+                }
+            }
+
+            // This should avoid allocating a new array as package.Files should be a boxed ImmutableArray<string>
+            var files = package.Files as IList<string> ?? package.Files.ToImmutableArray();
+
             var lockFileLib = new LockFileLibrary
             {
+                Files = files,
+                HasTools = hasTools,
                 Name = package.Id,
                 Version = package.Version,
                 Type = LibraryType.Package,
@@ -628,17 +626,6 @@ namespace NuGet.Commands
                 // package.
                 Path = path
             };
-
-            // Use for loop to avoid boxing enumerator
-            for (var i = 0; i < package.Files.Count; i++)
-            {
-                var file = package.Files[i];
-                if (!lockFileLib.HasTools && HasTools(file))
-                {
-                    lockFileLib.HasTools = true;
-                }
-                lockFileLib.Files.Add(file);
-            }
 
             return lockFileLib;
         }

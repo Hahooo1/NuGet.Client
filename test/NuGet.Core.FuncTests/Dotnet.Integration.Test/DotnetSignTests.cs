@@ -7,10 +7,11 @@ using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using System.Threading.Tasks;
 using FluentAssertions;
+using Microsoft.Internal.NuGet.Testing.SignedPackages;
+using Microsoft.Internal.NuGet.Testing.SignedPackages.ChildProcess;
 using NuGet.Common;
 using NuGet.Packaging.Signing;
 using NuGet.Test.Utility;
-using Test.Utility.Signing;
 using Xunit;
 using Xunit.Abstractions;
 using HashAlgorithmName = NuGet.Common.HashAlgorithmName;
@@ -80,7 +81,7 @@ namespace Dotnet.Integration.Test
                 CommandRunnerResult result = _dotnetFixture.RunDotnetExpectSuccess(
                     pathContext.PackageSource,
                     $"nuget sign .{Path.DirectorySeparatorChar}{packageFileName} " +
-                    $"--certificate-fingerprint {storeCertificate.Certificate.Thumbprint} " +
+                    $"--certificate-fingerprint {SignatureTestUtility.GetFingerprint(storeCertificate.Certificate, HashAlgorithmName.SHA256)} " +
                     $"--certificate-store-name {storeCertificate.StoreName} " +
                     $"--certificate-store-location {storeCertificate.StoreLocation}",
                     testOutputHelper: _testOutputHelper);
@@ -470,7 +471,7 @@ namespace Dotnet.Integration.Test
                 CommandRunnerResult result = _dotnetFixture.RunDotnetExpectSuccess(
                     pathContext.PackageSource,
                     $"nuget sign {packageFilePath} " +
-                    $"--certificate-fingerprint {storeCertificate.Certificate.Thumbprint}",
+                    $"--certificate-fingerprint {SignatureTestUtility.GetFingerprint(storeCertificate.Certificate, HashAlgorithmName.SHA256)}",
                     testOutputHelper: _testOutputHelper);
 
                 // Assert
@@ -504,14 +505,13 @@ namespace Dotnet.Integration.Test
                     CommandRunnerResult result = _dotnetFixture.RunDotnetExpectFailure(
                         pathContext.PackageSource,
                         $"nuget sign {packageFilePath} " +
-                        $"--certificate-fingerprint {storeCertificate.Certificate.Thumbprint} " +
+                        $"--certificate-fingerprint {SignatureTestUtility.GetFingerprint(storeCertificate.Certificate, HashAlgorithmName.SHA256)} " +
                         $"--timestamper {timestampService.Url}",
                     testOutputHelper: _testOutputHelper);
 
                     // Assert
                     result.AllOutput.Should().Contain(_timestampUnsupportedDigestAlgorithmCode);
                     Assert.Contains("The timestamp signature has an unsupported digest algorithm (SHA1). The following algorithms are supported: SHA256, SHA384, SHA512.", result.AllOutput);
-                    Assert.True(result.AllOutput.Contains(_insecureCertificateFingerprintCode), result.AllOutput);
 
                     byte[] resultingFile = File.ReadAllBytes(packageFilePath);
                     Assert.Equal(resultingFile, originalFile);
@@ -520,9 +520,12 @@ namespace Dotnet.Integration.Test
         }
 
         [PlatformFact(Platform.Windows, Platform.Linux)] // https://github.com/NuGet/Client.Engineering/issues/2781
-        public async Task DotnetSign_SignPackageWithInsecureCertificateFingerprint_RaisesWarningAsync()
+        public async Task DotnetSign_SignPackageWithInsecureCertificateFingerprint_ThrowsExceptionAsync()
         {
-            await ExecuteSignPackageTestWithCertificateFingerprintAsync(HashAlgorithmName.SHA1, expectInsecureFingerprintWarning: true);
+            var result = await ExecuteSignPackageTestWithCertificateFingerprintAsync(HashAlgorithmName.SHA1);
+
+            Assert.False(result.Success, result.AllOutput);
+            Assert.True(result.AllOutput.Contains(_insecureCertificateFingerprintCode), result.AllOutput);
         }
 
         [PlatformTheory(Platform.Windows, Platform.Linux)] // https://github.com/NuGet/Client.Engineering/issues/2781
@@ -531,12 +534,13 @@ namespace Dotnet.Integration.Test
         [InlineData(HashAlgorithmName.SHA512)]
         public async Task DotnetSign_SignPackageWithSecureCertificateFingerprint_SucceedsAsync(HashAlgorithmName hashAlgorithmName)
         {
-            await ExecuteSignPackageTestWithCertificateFingerprintAsync(hashAlgorithmName, expectInsecureFingerprintWarning: false);
+            var result = await ExecuteSignPackageTestWithCertificateFingerprintAsync(hashAlgorithmName);
+
+            Assert.True(result.Success, result.AllOutput);
+            Assert.False(result.AllOutput.Contains(_insecureCertificateFingerprintCode), result.AllOutput);
         }
 
-        private async Task ExecuteSignPackageTestWithCertificateFingerprintAsync(
-            HashAlgorithmName hashAlgorithmName,
-            bool expectInsecureFingerprintWarning)
+        private async Task<CommandRunnerResult> ExecuteSignPackageTestWithCertificateFingerprintAsync(HashAlgorithmName hashAlgorithmName)
         {
             // Arrange
             using SimpleTestPathContext pathContext = _dotnetFixture.CreateSimpleTestPathContext();
@@ -552,36 +556,29 @@ namespace Dotnet.Integration.Test
             var options = new TimestampServiceOptions() { SignatureHashAlgorithm = new Oid(Oids.Sha256) };
             TimestampService timestampService = TimestampService.Create(certificateAuthority, options);
             IX509StoreCertificate storeCertificate = _signFixture.UntrustedSelfIssuedCertificateInCertificateStore;
-            string certFingerprint = expectInsecureFingerprintWarning ? storeCertificate.Certificate.Thumbprint :
+            string certFingerprint = hashAlgorithmName == HashAlgorithmName.SHA1 ? storeCertificate.Certificate.Thumbprint :
                 SignatureTestUtility.GetFingerprint(storeCertificate.Certificate, hashAlgorithmName);
+            bool expectSuccess = hashAlgorithmName != HashAlgorithmName.SHA1;
 
             using (testServer.RegisterResponder(timestampService))
             {
                 // Act
-                CommandRunnerResult result = _dotnetFixture.RunDotnetExpectSuccess(
+                CommandRunnerResult result = _dotnetFixture.RunDotnet(
                     pathContext.PackageSource,
                     $"nuget sign {packageFilePath} " +
                     $"--certificate-fingerprint {certFingerprint} " +
                     $"--timestamper {timestampService.Url}",
+                    expectSuccess: expectSuccess,
                     testOutputHelper: _testOutputHelper);
 
-                // Assert
-                Assert.True(result.Success, result.AllOutput);
-                if (expectInsecureFingerprintWarning)
-                {
-                    Assert.True(result.AllOutput.Contains(_insecureCertificateFingerprintCode), result.AllOutput);
-                }
-                else
-                {
-                    Assert.False(result.AllOutput.Contains(_insecureCertificateFingerprintCode), result.AllOutput);
-                }
+                return result;
             }
         }
 
         private static string GetDefaultArgs(string packageFilePath, IX509StoreCertificate storeCertificate)
         {
             return $"nuget sign {packageFilePath} " +
-                $"--certificate-fingerprint {storeCertificate.Certificate.Thumbprint} " +
+                $"--certificate-fingerprint {SignatureTestUtility.GetFingerprint(storeCertificate.Certificate, HashAlgorithmName.SHA256)} " +
                 $"--certificate-store-name {storeCertificate.StoreName} " +
                 $"--certificate-store-location {storeCertificate.StoreLocation}";
         }

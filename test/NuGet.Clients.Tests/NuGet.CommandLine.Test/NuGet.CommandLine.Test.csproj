@@ -23,7 +23,6 @@
   
   <ItemGroup>
     <PackageReference Include="Microsoft.Build.Framework" ExcludeAssets="Runtime" />
-    <PackageReference Include="Microsoft.NET.StringTools" ExcludeAssets="Runtime" />
     <PackageReference Include="Microsoft.TestPlatform.Portable" IncludeAssets="None" />
   </ItemGroup>
 

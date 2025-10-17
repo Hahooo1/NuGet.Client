@@ -7,6 +7,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
+using System.Threading.Tasks;
 using Microsoft.Build.Evaluation;
 using NuGet.ProjectModel;
 
@@ -20,13 +21,13 @@ namespace NuGet.CommandLine.XPlat.Commands.Why
         /// Executes the 'why' command.
         /// </summary>
         /// <param name="whyCommandArgs">CLI arguments for the 'why' command.</param>
-        public static int ExecuteCommand(WhyCommandArgs whyCommandArgs)
+        public static Task<int> ExecuteCommand(WhyCommandArgs whyCommandArgs)
         {
             bool validArgumentsUsed = ValidatePathArgument(whyCommandArgs.Path, whyCommandArgs.Logger)
                                         && ValidatePackageArgument(whyCommandArgs.Package, whyCommandArgs.Logger);
             if (!validArgumentsUsed)
             {
-                return ExitCodes.InvalidArguments;
+                return Task.FromResult(ExitCodes.InvalidArguments);
             }
 
             string targetPackage = whyCommandArgs.Package;
@@ -43,7 +44,7 @@ namespace NuGet.CommandLine.XPlat.Commands.Why
                         Strings.WhyCommand_Error_ArgumentExceptionThrown,
                         ex.Message));
 
-                return ExitCodes.InvalidArguments;
+                return Task.FromResult(ExitCodes.InvalidArguments);
             }
 
             bool anyErrors = false;
@@ -85,7 +86,7 @@ namespace NuGet.CommandLine.XPlat.Commands.Why
                 }
             }
 
-            return anyErrors ? ExitCodes.Error : ExitCodes.Success;
+            return Task.FromResult(anyErrors ? ExitCodes.Error : ExitCodes.Success);
         }
 
         private static IEnumerable<(string assetsFilePath, string? projectPath)> FindAssetsFiles(string path, ILoggerWithColor logger)

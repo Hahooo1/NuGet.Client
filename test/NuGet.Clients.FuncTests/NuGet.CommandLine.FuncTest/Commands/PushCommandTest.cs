@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Net;
 using System.Threading;
+using Microsoft.Internal.NuGet.Testing.SignedPackages.ChildProcess;
 using NuGet.CommandLine.Test;
 using NuGet.Configuration;
 using NuGet.Test.Utility;
@@ -36,7 +37,7 @@ namespace NuGet.CommandLine.FuncTest.Commands
         /// 100 seconds is significant because that is the default timeout on <see cref="HttpClient"/>.
         /// Related to https://github.com/NuGet/Home/issues/2785.
         /// </summary>
-        [Fact]
+        [Fact(Skip = "https://github.com/NuGet/Home/issues/13843")]
         public void PushCommand_AllowsTimeoutToBeSpecifiedHigherThan100Seconds()
         {
             // Arrange
@@ -80,7 +81,7 @@ namespace NuGet.CommandLine.FuncTest.Commands
             }
         }
 
-        [Fact]
+        [Fact(Skip = "https://github.com/NuGet/Home/issues/13843")]
         public void PushCommand_AllowsTimeoutToBeSpecifiedLowerThan100Seconds()
         {
             // Arrange
@@ -298,7 +299,7 @@ namespace NuGet.CommandLine.FuncTest.Commands
         }
 
         /// <summary>
-        /// When pushing a snupkg wildcard where no matching files exist, show a File Not Found error. 
+        /// When pushing a snupkg wildcard where no matching files exist, show a File Not Found error.
         /// </summary>
         [Fact]
         public void PushCommand_Server_Snupkg_ByWildcard_FindsNothing_FileNotFoundError()
@@ -333,7 +334,7 @@ namespace NuGet.CommandLine.FuncTest.Commands
         }
 
         /// <summary>
-        /// When pushing a nupkg by filename where no matching files exist, show a File Not Found error. 
+        /// When pushing a nupkg by filename where no matching files exist, show a File Not Found error.
         /// </summary>
         [Fact]
         public void PushCommand_Server_Nupkg_ByFilename_FindsNothing_FileNotFoundError()
@@ -368,7 +369,7 @@ namespace NuGet.CommandLine.FuncTest.Commands
         }
 
         /// <summary>
-        /// When pushing a nupkg by wildcard where no matching files exist, show a File Not Found error. 
+        /// When pushing a nupkg by wildcard where no matching files exist, show a File Not Found error.
         /// </summary>
         [Fact]
         public void PushCommand_Server_Nupkg_ByWildcard_FindsNothing_FileNotFoundError()
@@ -403,7 +404,7 @@ namespace NuGet.CommandLine.FuncTest.Commands
         }
 
         /// <summary>
-        /// When pushing a nupkg by filename to a Symbol Server with no matching snupkg, do not show a File Not Found error. 
+        /// When pushing a nupkg by filename to a Symbol Server with no matching snupkg, do not show a File Not Found error.
         /// </summary>
         [Fact]
         public void PushCommand_Server_Nupkg_ByFilename_SnupkgDoesNotExist_NoFileNotFoundError()
@@ -518,7 +519,7 @@ namespace NuGet.CommandLine.FuncTest.Commands
                 using (var server = CreateAndStartMockV3Server(pathContext.WorkingDirectory, out string sourceName))
                 {
                     //Configure push to alternate returning Created and Conflict responses, which correspond to pushing the nupkg and snupkg, respectively.
-                    SetupMockServerCreateNupkgDuplicateSnupkg(server, pathContext.WorkingDirectory, FuncStatus_Alternates_CreatedAndDuplicate());
+                    SetupMockServerCreateNupkgDuplicateSnupkg(server, FuncStatus_Alternates_CreatedAndDuplicate());
                     pathContext.Settings.AddSource(sourceName, sourceName, "true");
                     // Act
 
@@ -560,6 +561,170 @@ namespace NuGet.CommandLine.FuncTest.Commands
             }
         }
 
+        [Fact]
+        public void PushCommand_Server_Nupkg_ByWildcard_NupkgAndSnupkgPushed()
+        {
+            // Arrange
+            using (SimpleTestPathContext pathContext = new SimpleTestPathContext())
+            {
+                var nuget = Util.GetNuGetExePath();
+
+                string packageId = "packageWithSnupkg";
+
+                //Create a nupkg in test directory.
+                string version = "1.1.0";
+                Util.CreateTestPackage(packageId, version, pathContext.WorkingDirectory);
+                string nupkgFileName = Util.BuildPackageString(packageId, version, NuGetConstants.PackageExtension);
+                string snupkgFileName = Util.BuildPackageString(packageId, version, NuGetConstants.SnupkgExtension);
+                string snupkgFullPath = Path.Combine(pathContext.WorkingDirectory, snupkgFileName);
+                //Create snupkg in test directory.
+                WriteSnupkgFile(snupkgFullPath);
+
+                string wildcardPush = "*.nupkg";
+                var sourcePushUrl = string.Empty;
+
+                CommandRunnerResult result = null;
+
+                using (var server = CreateAndStartMockV3Server(pathContext.WorkingDirectory, out string sourceName))
+                {
+                    sourcePushUrl = SetupMockServerAlwaysCreate(server);
+                    pathContext.Settings.AddSource(sourceName, sourceName, "true");
+
+                    // Act
+                    //Since this is V3, this will trigger 2 pushes: one for nupkgs, and one for snupkgs.
+                    result = CommandRunner.Run(
+                        nuget,
+                        pathContext.WorkingDirectory,
+                        $"push {wildcardPush} -Source {sourceName} -Timeout 110",
+                        timeOutInMilliseconds: 120000,
+                        testOutputHelper: _testOutputHelper); // 120 seconds
+                }
+
+                // Assert
+                string genericFileNotFoundError = WITHOUT_FILENAME_MESSAGE_FILE_DOES_NOT_EXIST;
+                string pushingMessage = "Pushing {0} to '{1}'";
+
+                //Both should push, but to different servers
+                Assert.True(result.Success);
+                Assert.Contains(MESSAGE_PACKAGE_PUSHED, result.AllOutput); // files pushed
+                Assert.DoesNotContain(genericFileNotFoundError, result.Errors);
+                Assert.Contains(string.Format(pushingMessage, nupkgFileName, sourcePushUrl), result.AllOutput); //nupkg push to source
+                Assert.Contains(string.Format(pushingMessage, snupkgFileName, sourcePushUrl), result.AllOutput); //snupkg push to source
+            }
+        }
+
+        [Fact]
+        public void PushCommand_Server_Nupkg_ByWildcard_SeparateSymbolUrl_NupkgAndSnupkgPushedToDifferentSources()
+        {
+            // Arrange
+            using (SimpleTestPathContext pathContext = new SimpleTestPathContext())
+            {
+                var nuget = Util.GetNuGetExePath();
+
+                string packageId = "packageWithSnupkg";
+
+                //Create a nupkg in test directory.
+                string version = "1.1.0";
+                Util.CreateTestPackage(packageId, version, pathContext.WorkingDirectory);
+                string nupkgFileName = Util.BuildPackageString(packageId, version, NuGetConstants.PackageExtension);
+                string snupkgFileName = Util.BuildPackageString(packageId, version, NuGetConstants.SnupkgExtension);
+                string snupkgFullPath = Path.Combine(pathContext.WorkingDirectory, snupkgFileName);
+                //Create snupkg in test directory.
+                WriteSnupkgFile(snupkgFullPath);
+
+                string wildcardPush = "*.nupkg";
+                var sourcePushUrl = string.Empty;
+                var symbolPushUrl = string.Empty;
+
+                CommandRunnerResult result = null;
+
+                using (var server = CreateAndStartMockV3Server(pathContext.WorkingDirectory, out string sourceName))
+                using (var symbolServer = CreateAndStartMockV3Server(pathContext.WorkingDirectory, out string symbolSourceName))
+                {
+                    sourcePushUrl = SetupMockServerAlwaysCreate(server);
+                    symbolPushUrl = SetupMockServerAlwaysCreate(symbolServer);
+                    pathContext.Settings.AddSource(sourceName, sourceName, "true");
+                    pathContext.Settings.AddSource(symbolSourceName, symbolSourceName, "true");
+
+                    // Act
+                    //Since this is V3, this will trigger 2 pushes: one for nupkgs, and one for snupkgs.
+                    result = CommandRunner.Run(
+                        nuget,
+                        pathContext.WorkingDirectory,
+                        $"push {wildcardPush} -Source {sourceName} -SymbolSource {symbolSourceName} -Timeout 110",
+                        timeOutInMilliseconds: 120000,
+                        testOutputHelper: _testOutputHelper); // 120 seconds
+                }
+
+                // Assert
+                string genericFileNotFoundError = WITHOUT_FILENAME_MESSAGE_FILE_DOES_NOT_EXIST;
+                string pushingMessage = "Pushing {0} to '{1}'";
+
+                //Both should push, but to different servers
+                Assert.True(result.Success);
+                Assert.Contains(MESSAGE_PACKAGE_PUSHED, result.AllOutput); // files pushed
+                Assert.DoesNotContain(genericFileNotFoundError, result.Errors);
+                Assert.Contains(string.Format(pushingMessage, nupkgFileName, sourcePushUrl), result.AllOutput); //nupkg push to source
+                Assert.Contains(string.Format(pushingMessage, snupkgFileName, symbolPushUrl), result.AllOutput); //snupkg push to symbol source
+            }
+        }
+
+        [Fact]
+        public void PushCommand_Server_Nupkg_SeparateSymbolUrl_NoSymbolTrue_SnupkgNotPushed()
+        {
+            // Arrange
+            using (SimpleTestPathContext pathContext = new SimpleTestPathContext())
+            {
+                var nuget = Util.GetNuGetExePath();
+
+                string packageId = "packageWithSnupkg";
+
+                //Create a nupkg in test directory.
+                string version = "1.1.0";
+                Util.CreateTestPackage(packageId, version, pathContext.WorkingDirectory);
+                string nupkgFileName = Util.BuildPackageString(packageId, version, NuGetConstants.PackageExtension);
+                string snupkgFileName = Util.BuildPackageString(packageId, version, NuGetConstants.SnupkgExtension);
+                string snupkgFullPath = Path.Combine(pathContext.WorkingDirectory, snupkgFileName);
+                //Create snupkg in test directory.
+                WriteSnupkgFile(snupkgFullPath);
+
+                string wildcardPush = "*.nupkg";
+                var sourcePushUrl = string.Empty;
+                var symbolPushUrl = string.Empty;
+
+                CommandRunnerResult result = null;
+
+                using (var server = CreateAndStartMockV3Server(pathContext.WorkingDirectory, out string sourceName))
+                using (var symbolServer = CreateAndStartMockV3Server(pathContext.WorkingDirectory, out string symbolSourceName))
+                {
+                    sourcePushUrl = SetupMockServerAlwaysCreate(server);
+                    symbolPushUrl = SetupMockServerAlwaysCreate(symbolServer);
+                    pathContext.Settings.AddSource(sourceName, sourceName, "true");
+                    pathContext.Settings.AddSource(symbolSourceName, symbolSourceName, "true");
+
+                    // Act
+                    //Since this is V3, this will trigger 2 pushes: one for nupkgs, and one for snupkgs.
+                    result = CommandRunner.Run(
+                        nuget,
+                        pathContext.WorkingDirectory,
+                        $"push {wildcardPush} -Source {sourceName} -SymbolSource {symbolPushUrl} -noSymbol -Timeout 110",
+                        timeOutInMilliseconds: 120000,
+                        testOutputHelper: _testOutputHelper); // 120 seconds
+                }
+
+                // Assert
+                string genericFileNotFoundError = WITHOUT_FILENAME_MESSAGE_FILE_DOES_NOT_EXIST;
+                string pushingMessage = "Pushing {0} to '{1}'";
+
+                //Both should push, but to different servers
+                Assert.True(result.Success);
+                Assert.Contains(MESSAGE_PACKAGE_PUSHED, result.AllOutput); // files pushed
+                Assert.DoesNotContain(genericFileNotFoundError, result.Errors);
+                Assert.Contains(string.Format(pushingMessage, nupkgFileName, sourcePushUrl), result.AllOutput); //nupkg push to source
+                Assert.DoesNotContain(".snupkg", result.AllOutput); //snupkg not pushed
+            }
+        }
+
         /// <summary>
         /// When pushing *.Nupkg, (no skip duplicate) a 409 Conflict is returned and halts the secondary symbols push.
         /// </summary>
@@ -589,7 +754,7 @@ namespace NuGet.CommandLine.FuncTest.Commands
                 using (var server = CreateAndStartMockV3Server(pathContext.WorkingDirectory, out string sourceName))
                 {
                     //Configure push to return a Conflict for the first push, then Created for all remaining pushes.
-                    SetupMockServerCreateNupkgDuplicateSnupkg(server, pathContext.WorkingDirectory, FuncStatus_Duplicate_ThenAlwaysCreated());
+                    SetupMockServerCreateNupkgDuplicateSnupkg(server, FuncStatus_Duplicate_ThenAlwaysCreated());
                     pathContext.Settings.AddSource(sourceName, sourceName, "true");
                     // Act
 
@@ -713,7 +878,7 @@ namespace NuGet.CommandLine.FuncTest.Commands
                 using (var server = CreateAndStartMockV3Server(pathContext.WorkingDirectory, out string sourceName))
                 {
                     //Configure push to return a Conflict for the first push, then Created for all remaining pushes.
-                    SetupMockServerCreateNupkgDuplicateSnupkg(server, pathContext.WorkingDirectory, FuncStatus_Duplicate_ThenAlwaysCreated());
+                    SetupMockServerCreateNupkgDuplicateSnupkg(server, FuncStatus_Duplicate_ThenAlwaysCreated());
                     pathContext.Settings.AddSource(sourceName, sourceName, "true");
                     // Act
 
@@ -917,12 +1082,13 @@ namespace NuGet.CommandLine.FuncTest.Commands
             }));
         }
 
-        private static void SetupMockServerAlwaysCreate(MockServer server)
+        private static string SetupMockServerAlwaysCreate(MockServer server)
         {
             server.Put.Add("/push", (Func<HttpListenerRequest, object>)((r) =>
             {
                 return HttpStatusCode.Created;
             }));
+            return server.Uri + "push";
         }
 
 
@@ -944,17 +1110,17 @@ namespace NuGet.CommandLine.FuncTest.Commands
         }
 
 
-        private static void SetupMockServerCreateNupkgDuplicateSnupkg(MockServer server,
-                                                              string outputPath,
-                                                              Func<int, HttpStatusCode> responseCodeFunc)
+        private static void SetupMockServerCreateNupkgDuplicateSnupkg(
+            MockServer server,
+            Func<int, HttpStatusCode> responseCodeFunc)
         {
             int packageCounter = 0;
-            server.Put.Add("/push", (Func<HttpListenerRequest, object>)((r) =>
+            server.Put.Add("/push", _ =>
             {
                 packageCounter++;
                 var statusCode = responseCodeFunc(packageCounter);
                 return statusCode;
-            }));
+            });
         }
 
         /// <summary>

@@ -151,6 +151,7 @@ namespace NuGet.SolutionRestoreManager
             public string ProjectUniqueName { get; set; }
         }
 
+        [Obsolete]
         Task<bool> IVsSolutionRestoreService.NominateProjectAsync(string projectUniqueName, IVsProjectRestoreInfo projectRestoreInfo, CancellationToken token)
         {
             const string eventName = nameof(IVsSolutionRestoreService) + "." + nameof(NominateProjectAsync);
@@ -160,11 +161,10 @@ namespace NuGet.SolutionRestoreManager
             };
             using var _ = NuGetETW.ExtensibilityEventSource.StartStopEvent(eventName, eventData);
 
-            var projectRestoreInfoAdapter = ProjectRestoreInfo3Adapter.Create(projectRestoreInfo);
-
-            return NominateProjectAsync(projectUniqueName, projectRestoreInfoAdapter, token);
+            throw new NotSupportedException("This API is deprecated but has not been removed to maintain COM compatibility");
         }
 
+        [Obsolete]
         Task<bool> IVsSolutionRestoreService3.NominateProjectAsync(string projectUniqueName, IVsProjectRestoreInfo2 projectRestoreInfo, CancellationToken token)
         {
             const string eventName = nameof(IVsSolutionRestoreService3) + "." + nameof(NominateProjectAsync);
@@ -174,9 +174,7 @@ namespace NuGet.SolutionRestoreManager
             };
             using var _ = NuGetETW.ExtensibilityEventSource.StartStopEvent(eventName, eventData);
 
-            var projectRestoreInfoAdapter = ProjectRestoreInfo3Adapter.Create(projectRestoreInfo);
-
-            return NominateProjectAsync(projectUniqueName, projectRestoreInfoAdapter, token);
+            throw new NotSupportedException("This API is deprecated but has not been removed to maintain COM compatibility");
         }
 
         Task<bool> IVsSolutionRestoreService5.NominateProjectAsync(string projectUniqueName, IVsProjectRestoreInfo3 projectRestoreInfo, CancellationToken token)
@@ -251,9 +249,6 @@ namespace NuGet.SolutionRestoreManager
 
             try
             {
-                _logger.LogInformation(
-                    $"The nominate API is called for '{projectUniqueName}'.");
-
                 ProjectNames projectNames = await GetProjectNamesAsync(projectUniqueName, token);
 
                 DependencyGraphSpec dgSpec;
@@ -324,12 +319,13 @@ namespace NuGet.SolutionRestoreManager
             var targetFrameworks = projectRestoreInfo.TargetFrameworks;
 
             var cpvmEnabled = VSNominationUtilities.IsCentralPackageVersionManagementEnabled(targetFrameworks);
+            var isPruningEnabledGlobally = VSNominationUtilities.IsPruningEnabledGlobally(targetFrameworks);
 
             TargetFrameworkInformation[] tfis = new TargetFrameworkInformation[targetFrameworks.Count];
             for (int i = 0; i < targetFrameworks.Count; i++)
             {
                 IVsTargetFrameworkInfo4 targetFrameworkInfo = targetFrameworks[i];
-                TargetFrameworkInformation tfi = VSNominationUtilities.ToTargetFrameworkInformation(targetFrameworkInfo, cpvmEnabled, projectNames.FullName);
+                TargetFrameworkInformation tfi = VSNominationUtilities.ToTargetFrameworkInformation(targetFrameworkInfo, cpvmEnabled, isPruningEnabledGlobally, projectNames.FullName);
                 tfis[i] = tfi;
             }
 
@@ -392,7 +388,7 @@ namespace NuGet.SolutionRestoreManager
                     UseLegacyDependencyResolver = VSNominationUtilities.GetUseLegacyDependencyResolver(targetFrameworks),
                 },
                 RuntimeGraph = VSNominationUtilities.GetRuntimeGraph(targetFrameworks),
-                RestoreSettings = new ProjectRestoreSettings() { HideWarningsAndErrors = true },
+                RestoreSettings = new ProjectRestoreSettings() { HideWarningsAndErrors = true, SdkVersion = VSNominationUtilities.GetSdkVersion(targetFrameworks) },
             };
 
             return packageSpec;

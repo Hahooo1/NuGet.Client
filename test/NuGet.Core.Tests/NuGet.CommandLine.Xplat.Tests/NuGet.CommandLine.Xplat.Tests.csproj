@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFramework>$(NETCoreTargetFramework)</TargetFramework>
+    <TargetFramework>$(LatestNETCoreTargetFramework)</TargetFramework>
     <Description>Unit tests for NuGet.CommandLine.XPlat.</Description>
   </PropertyGroup>
 
@@ -13,15 +13,14 @@
     <PackageReference Include="Microsoft.Build" ExcludeAssets="runtime" />
     <PackageReference Include="Microsoft.Build.Framework" ExcludeAssets="runtime" />
     <PackageReference Include="Microsoft.Build.Locator" />
-    <PackageReference Include="System.Memory" />
     <PackageReference Include="System.CommandLine" />
   </ItemGroup>
 
   <ItemGroup>
-    <Folder Include="compiler\resources\" />
-  </ItemGroup>
-
-  <ItemGroup>
     <EmbeddedResource Include="compiler\resources\DNW.Test.SampleProject1.project.assets.json" />
+    <EmbeddedResource Include="compiler\resources\Test.SampleProject2.project.assets.json" />
+    <EmbeddedResource Include="compiler\resources\Test.TwoDifferentVersions.project.assets.json" />
+    <EmbeddedResource Include="compiler\resources\Test.MultiTfmMultiRidProject.project.assets.json" />
+    <EmbeddedResource Include="compiler\resources\Test.NoPackageRidSpecificPackageProject.project.assets.json" />
   </ItemGroup>
 </Project>

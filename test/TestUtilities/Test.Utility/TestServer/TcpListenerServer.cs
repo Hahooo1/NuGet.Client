@@ -11,6 +11,7 @@ using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Internal.NuGet.Testing.SignedPackages.TestServer;
 
 namespace NuGet.Test.Server
 {
@@ -69,9 +70,6 @@ namespace NuGet.Test.Server
                 },
                 CancellationToken.None);
         }
-
-        public TcpListenerServer()
-        { }
 
         private static X509Certificate2 GenerateSelfSignedCertificate()
         {

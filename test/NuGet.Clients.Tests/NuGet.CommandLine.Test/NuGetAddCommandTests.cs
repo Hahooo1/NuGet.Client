@@ -4,6 +4,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using Microsoft.Internal.NuGet.Testing.SignedPackages.ChildProcess;
 using NuGet.Packaging;
 using NuGet.Packaging.Core;
 using NuGet.Test.Utility;
@@ -438,7 +439,6 @@ namespace NuGet.CommandLine.Test
 
             public string NuGetExePath { get; }
             public string SourceParamFolder { get; set; }
-            public string RandomNupkgFolder { get { return Path.GetDirectoryName(RandomNupkgFilePath); } }
             public PackageIdentity Package { get; }
             public FileInfo TestPackage { get; set; }
             public string RandomNupkgFilePath { get { return TestPackage.FullName; } }

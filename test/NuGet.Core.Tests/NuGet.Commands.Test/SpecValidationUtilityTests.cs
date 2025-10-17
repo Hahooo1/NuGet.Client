@@ -1,9 +1,13 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using FluentAssertions;
+using Moq;
+using NuGet.Common;
 using NuGet.Frameworks;
 using NuGet.LibraryModel;
 using NuGet.ProjectModel;
@@ -53,6 +57,10 @@ namespace NuGet.Commands.Test
             // Arrange
             var spec = new DependencyGraphSpec();
             spec.AddRestore("a");
+            var errors = new List<NuGetLogCode>();
+            var mockLogger = new Mock<ILogger>();
+            mockLogger.Setup(l => l.Log(It.IsAny<ILogMessage>()))
+                .Callback((ILogMessage message) => { errors.Add(message.Code); });
 
             var targetFramework = new TargetFrameworkInformation()
             {
@@ -72,8 +80,12 @@ namespace NuGet.Commands.Test
 
             spec.AddProject(project);
 
-            // Act && Assert
-            AssertError(spec, "Invalid target framework");
+            // Act
+            Action act = () => SpecValidationUtility.ValidateDependencySpec(spec, new HashSet<string>(), mockLogger.Object);
+
+            // Assert
+            act.Should().Throw<RestoreSpecException>().Where(e => e.Message.Contains(project.FilePath));
+            errors.Should().Contain(NuGetLogCode.NU1105);
         }
 
         [Fact]
@@ -148,11 +160,6 @@ namespace NuGet.Commands.Test
                     ProjectUniqueName = "b"
                 });
 
-            spec.Projects.First().Dependencies.Add(new LibraryDependency()
-            {
-                LibraryRange = new LibraryRange("b", LibraryDependencyTarget.PackageProjectExternal)
-            });
-
             // Act && Assert no errors
             SpecValidationUtility.ValidateDependencySpec(spec);
         }
@@ -171,10 +178,11 @@ namespace NuGet.Commands.Test
                     ProjectUniqueName = "b"
                 });
 
-            spec.Projects.First().TargetFrameworks.First().Dependencies.Add(new LibraryDependency()
+            var newDependencies = spec.Projects.First().TargetFrameworks.First().Dependencies.Add(new LibraryDependency()
             {
                 LibraryRange = new LibraryRange("b", LibraryDependencyTarget.PackageProjectExternal)
             });
+            spec.Projects[0].TargetFrameworks[0] = new TargetFrameworkInformation(spec.Projects[0].TargetFrameworks[0]) { Dependencies = newDependencies };
 
             // Act && Assert no errors
             SpecValidationUtility.ValidateDependencySpec(spec);
@@ -242,8 +250,14 @@ namespace NuGet.Commands.Test
             var spec = new DependencyGraphSpec();
             spec.AddRestore("a");
 
+            var libraryDependency = new LibraryDependency()
+            {
+                LibraryRange = new LibraryRange("x", VersionRange.Parse("1.0.0"), LibraryDependencyTarget.PackageProjectExternal)
+            };
+
             var targetFramework1 = new TargetFrameworkInformation()
             {
+                Dependencies = [libraryDependency],
                 FrameworkName = NuGetFramework.Parse("net45")
             };
 
@@ -260,11 +274,6 @@ namespace NuGet.Commands.Test
             project.RestoreMetadata.ProjectName = "some_other_name";
             project.RestoreMetadata.ProjectPath = Path.Combine(Directory.GetCurrentDirectory(), "a.csproj");
             project.RestoreMetadata.ProjectStyle = ProjectStyle.Unknown;
-
-            targetFramework1.Dependencies.Add(new LibraryDependency()
-            {
-                LibraryRange = new LibraryRange("x", VersionRange.Parse("1.0.0"), LibraryDependencyTarget.PackageProjectExternal)
-            });
 
             spec.AddProject(project);
 
@@ -407,8 +416,14 @@ namespace NuGet.Commands.Test
             var spec = new DependencyGraphSpec();
             spec.AddRestore("a");
 
+            var libraryDependency = new LibraryDependency()
+            {
+                LibraryRange = new LibraryRange("x", VersionRange.Parse("1.0.0"), LibraryDependencyTarget.PackageProjectExternal)
+            };
+
             var targetFramework1 = new TargetFrameworkInformation()
             {
+                Dependencies = [libraryDependency],
                 FrameworkName = NuGetFramework.Parse("net45")
             };
 
@@ -423,15 +438,10 @@ namespace NuGet.Commands.Test
             project.RestoreMetadata.ProjectPath = Path.Combine(Directory.GetCurrentDirectory(), "a.csproj");
             project.RestoreMetadata.ProjectStyle = ProjectStyle.Unknown;
 
-            targetFramework1.Dependencies.Add(new LibraryDependency()
-            {
-                LibraryRange = new LibraryRange("x", VersionRange.Parse("1.0.0"), LibraryDependencyTarget.PackageProjectExternal)
-            });
-
             spec.AddProject(project);
 
             // Act && Assert
-            AssertError(spec, "Property 'Dependencies' is not allowed");
+            AssertError(spec, "Property 'dependencies' is not allowed");
         }
 
         [Fact]

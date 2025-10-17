@@ -9,14 +9,14 @@ using System.Numerics;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using System.Text;
+using Microsoft.Internal.NuGet.Testing.SignedPackages;
 using NuGet.Common;
-using Test.Utility.Signing;
 using Xunit;
-using TestAccuracy = Test.Utility.Signing.Accuracy;
-using TestAlgorithmIdentifier = Test.Utility.Signing.AlgorithmIdentifier;
-using TestGeneralName = Test.Utility.Signing.GeneralName;
-using TestMessageImprint = Test.Utility.Signing.MessageImprint;
-using TestTstInfo = Test.Utility.Signing.TstInfo;
+using TestAccuracy = Microsoft.Internal.NuGet.Testing.SignedPackages.Asn1.Accuracy;
+using TestAlgorithmIdentifier = Microsoft.Internal.NuGet.Testing.SignedPackages.Asn1.AlgorithmIdentifier;
+using TestGeneralName = Microsoft.Internal.NuGet.Testing.SignedPackages.Asn1.GeneralName;
+using TestMessageImprint = Microsoft.Internal.NuGet.Testing.SignedPackages.Asn1.MessageImprint;
+using TestTstInfo = Microsoft.Internal.NuGet.Testing.SignedPackages.Asn1.TstInfo;
 using TstInfo = NuGet.Packaging.Signing.TstInfo;
 
 namespace NuGet.Packaging.Test
@@ -181,13 +181,6 @@ namespace NuGet.Packaging.Test
             }
         }
 
-        private static byte[] GetDefaultSha256Hash()
-        {
-            byte[] data = Encoding.UTF8.GetBytes("peach");
-
-            return Common.HashAlgorithmName.SHA256.ComputeHash(data);
-        }
-
         private static TestTstInfo CreateTestTstInfo(
             TestAccuracy? accuracy = null,
             bool ordering = false,
@@ -209,7 +202,6 @@ namespace NuGet.Packaging.Test
                 serialNumber,
                 timestamp,
                 accuracy,
-                ordering,
                 nonce,
                 tsa,
                 extensions);

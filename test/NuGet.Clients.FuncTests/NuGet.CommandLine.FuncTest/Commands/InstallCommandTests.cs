@@ -8,6 +8,8 @@ using System.Linq;
 using System.Security.Cryptography.X509Certificates;
 using System.Threading.Tasks;
 using FluentAssertions;
+using Microsoft.Internal.NuGet.Testing.SignedPackages;
+using Microsoft.Internal.NuGet.Testing.SignedPackages.ChildProcess;
 using NuGet.Test.Utility;
 using Test.Utility.Signing;
 using Xunit;
@@ -31,16 +33,17 @@ namespace NuGet.CommandLine.FuncTest.Commands
         private static readonly string NU3018Message = "The author primary signature's signing certificate is not trusted by the trust provider.";
         private static readonly string NU3018 = "NU3018: {0}";
 
-        private SignCommandTestFixture _testFixture;
+        private readonly SignCommandTestFixture _testFixture;
         private readonly ITestOutputHelper _testOutputHelper;
-        private TrustedTestCert<TestCertificate> _trustedTestCert;
-        private string _nugetExePath;
+        private readonly TrustedTestCert<TestCertificate> _trustedTestCert;
+        private readonly string _nugetExePath;
 
         public InstallCommandTests(SignCommandTestFixture fixture, ITestOutputHelper testOutputHelper)
         {
             _testFixture = fixture ?? throw new ArgumentNullException(nameof(fixture));
             _testOutputHelper = testOutputHelper;
-            _trustedTestCert = SigningTestUtility.GenerateTrustedTestCertificate();
+            // Do not dispose this.  The fixture will dispose it.
+            _trustedTestCert = fixture.TrustedTestCertificate;
             _nugetExePath = _testFixture.NuGetExePath;
         }
 

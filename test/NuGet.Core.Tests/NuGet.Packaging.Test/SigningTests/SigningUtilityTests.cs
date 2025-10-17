@@ -3,19 +3,15 @@
 
 using System;
 using System.Collections.Generic;
-#if IS_SIGNING_SUPPORTED
 using System.IO;
 using System.IO.Compression;
-using System.Linq;
 using System.Security.Cryptography;
 using System.Security.Cryptography.Pkcs;
-#endif
 using System.Security.Cryptography.X509Certificates;
-#if IS_SIGNING_SUPPORTED
+using Microsoft.Internal.NuGet.Testing.SignedPackages;
 using System.Threading;
 using System.Threading.Tasks;
 using Moq;
-#endif
 using NuGet.Common;
 using NuGet.Packaging.Signing;
 using NuGet.Test.Utility;
@@ -24,9 +20,7 @@ using Xunit;
 
 namespace NuGet.Packaging.Test
 {
-#if IS_SIGNING_SUPPORTED
     using HashAlgorithmName = Common.HashAlgorithmName;
-#endif
 
     [Collection(SigningTestsCollection.Name)]
     public class SigningUtilityTests
@@ -154,7 +148,6 @@ namespace NuGet.Packaging.Test
 
         }
 
-#if IS_SIGNING_SUPPORTED
         [Fact]
         public void CreateSignedAttributes_SignPackageRequest_WhenRequestNull_Throws()
         {
@@ -578,7 +571,7 @@ namespace NuGet.Packaging.Test
                 using (var zipArchive = new ZipArchive(packageStream, ZipArchiveMode.Read, leaveOpen: true))
                 {
                     // Sanity check before testing.
-                    Assert.Equal(desiredFileCount, zipArchive.Entries.Count());
+                    Assert.Equal(desiredFileCount, zipArchive.Entries.Count);
                 }
 
                 packageStream.Position = 0;
@@ -676,7 +669,6 @@ namespace NuGet.Packaging.Test
                     logger);
             }
         }
-#endif
 
         private static AuthorSignPackageRequest CreateRequest(X509Certificate2 certificate)
         {

@@ -20,8 +20,6 @@ namespace NuGet.Tests.Apex.Daily
         [Timeout(DefaultTimeout)]
         public async Task InstallPackageToSDKBasedProjectFromUI(ProjectTemplate projectTemplate)
         {
-            EnsureVisualStudioHost();
-
             using (var testContext = new ApexTestContext(VisualStudio, projectTemplate, Logger, addNetStandardFeeds: true))
             {
                 // Arrange
@@ -39,7 +37,7 @@ namespace NuGet.Tests.Apex.Daily
 
                 // Assert
                 VisualStudio.AssertNuGetOutputDoesNotHaveErrors();
-                CommonUtility.AssertPackageReferenceExists(VisualStudio, testContext.Project, packageName, packageVersion, Logger);
+                CommonUtility.AssertPackageReferenceExists(testContext.Project, packageName, packageVersion, Logger);
             }
         }
 
@@ -52,8 +50,6 @@ namespace NuGet.Tests.Apex.Daily
         [Timeout(DefaultTimeout)]
         public async Task UpdatePackageToSDKBasedProjectFromUI(ProjectTemplate projectTemplate)
         {
-            EnsureVisualStudioHost();
-
             using (var testContext = new ApexTestContext(VisualStudio, projectTemplate, Logger, addNetStandardFeeds: true))
             {
                 // Arrange
@@ -80,7 +76,7 @@ namespace NuGet.Tests.Apex.Daily
 
                 // Assert
                 VisualStudio.AssertNuGetOutputDoesNotHaveErrors();
-                CommonUtility.AssertPackageReferenceExists(VisualStudio, testContext.Project, packageName, packageVersion2, Logger);
+                CommonUtility.AssertPackageReferenceExists(testContext.Project, packageName, packageVersion2, Logger);
             }
         }
 
@@ -93,8 +89,6 @@ namespace NuGet.Tests.Apex.Daily
         [Timeout(DefaultTimeout)]
         public async Task UninstallPackageFromSDKBasedProjectFromUI(ProjectTemplate projectTemplate)
         {
-            EnsureVisualStudioHost();
-
             using (var testContext = new ApexTestContext(VisualStudio, projectTemplate, Logger, addNetStandardFeeds: true))
             {
                 // Arrange
@@ -119,7 +113,7 @@ namespace NuGet.Tests.Apex.Daily
 
                 // Assert
                 VisualStudio.AssertNuGetOutputDoesNotHaveErrors();
-                CommonUtility.AssertPackageReferenceDoesNotExist(VisualStudio, testContext.Project, packageName, Logger);
+                CommonUtility.AssertPackageReferenceDoesNotExist(testContext.Project, packageName, Logger);
             }
         }
 

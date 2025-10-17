@@ -110,11 +110,10 @@ namespace NuGet.Build.Tasks
         {
             ProjectStyle.DotnetCliTool,
             ProjectStyle.PackageReference,
-            ProjectStyle.Standalone,
             ProjectStyle.ProjectJson
         };
 
-        public static Task<bool> RestoreAsync(
+        public static Task<List<RestoreSummary>> RestoreAsync(
             DependencyGraphSpec dependencyGraphSpec,
             bool interactive,
             bool recursive,
@@ -131,7 +130,7 @@ namespace NuGet.Build.Tasks
             return RestoreAsync(dependencyGraphSpec, interactive, recursive, noCache, ignoreFailedSources, disableParallel, force, forceEvaluate, hideWarningsAndErrors, restorePC, cleanupAssetsForUnsupportedProjects: false, log, cancellationToken);
         }
 
-        public static async Task<bool> RestoreAsync(
+        public static async Task<List<RestoreSummary>> RestoreAsync(
             DependencyGraphSpec dependencyGraphSpec,
             bool interactive,
             bool recursive,
@@ -227,7 +226,6 @@ namespace NuGet.Build.Tasks
                         var restoreContext = new RestoreArgs()
                         {
                             CacheContext = cacheContext,
-                            LockFileVersion = LockFileFormat.Version,
                             // 'dotnet restore' fails on slow machines (https://github.com/NuGet/Home/issues/6742)
                             // The workaround is to pass the '--disable-parallel' option.
                             // We apply the workaround by default when the system has 1 cpu.
@@ -289,7 +287,7 @@ namespace NuGet.Build.Tasks
                 {
                     RestoreSummary.Log(log, restoreSummaries);
                 }
-                return restoreSummaries.All(x => x.Success);
+                return restoreSummaries;
             }
             finally
             {
@@ -326,13 +324,12 @@ namespace NuGet.Build.Tasks
         /// </summary>
         /// <param name="restoreProjectStyle">An optional user supplied restore style.</param>
         /// <param name="hasPackageReferenceItems">A <see cref="bool"/> indicating whether or not the project has any PackageReference items.</param>
-        /// <param name="projectJsonPath">An optional path to the project's project.json file.</param>
         /// <param name="projectDirectory">The full path to the project directory.</param>
         /// <param name="projectName">The name of the project file.</param>
         /// <param name="log">An <see cref="NuGet.Common.ILogger"/> object used to log messages.</param>
         /// <returns>A <see cref="Tuple{ProjectStyle, Boolean}"/> containing the project style and a value indicating if the project is using a style that is compatible with PackageReference.
         /// If the value of <paramref name="restoreProjectStyle"/> is not empty and could not be parsed, <code>null</code> is returned.</returns>
-        public static (ProjectStyle ProjectStyle, bool IsPackageReferenceCompatibleProjectStyle, string PackagesConfigFilePath) GetProjectRestoreStyle(ProjectStyle? restoreProjectStyle, bool hasPackageReferenceItems, string projectJsonPath, string projectDirectory, string projectName, Common.ILogger log)
+        public static (ProjectStyle ProjectStyle, string PackagesConfigFilePath) GetProjectRestoreStyle(ProjectStyle? restoreProjectStyle, bool hasPackageReferenceItems, string projectDirectory, string projectName, Common.ILogger log)
         {
             ProjectStyle projectStyle;
             string packagesConfigFilePath = null;
@@ -347,11 +344,6 @@ namespace NuGet.Build.Tasks
                 // If any PackageReferences exist treat it as PackageReference. This has priority over project.json.
                 projectStyle = ProjectStyle.PackageReference;
             }
-            else if (!string.IsNullOrWhiteSpace(projectJsonPath))
-            {
-                // If this is not a PackageReference project check if project.json or projectName.project.json exists.
-                projectStyle = ProjectStyle.ProjectJson;
-            }
             else if (ProjectHasPackagesConfigFile(projectDirectory, projectName, out packagesConfigFilePath))
             {
                 // If this is not a PackageReference or ProjectJson project check if packages.config or packages.ProjectName.config exists
@@ -363,9 +355,7 @@ namespace NuGet.Build.Tasks
                 projectStyle = ProjectStyle.Unknown;
             }
 
-            bool isPackageReferenceCompatibleProjectStyle = projectStyle == ProjectStyle.PackageReference || projectStyle == ProjectStyle.DotnetToolReference;
-
-            return (projectStyle, isPackageReferenceCompatibleProjectStyle, packagesConfigFilePath);
+            return (projectStyle, packagesConfigFilePath);
         }
 
 
@@ -374,15 +364,14 @@ namespace NuGet.Build.Tasks
         /// </summary>
         /// <param name="restoreProjectStyle">An optional user supplied restore style.</param>
         /// <param name="hasPackageReferenceItems">A <see cref="bool"/> indicating whether or not the project has any PackageReference items.</param>
-        /// <param name="projectJsonPath">An optional path to the project's project.json file.</param>
         /// <param name="projectDirectory">The full path to the project directory.</param>
         /// <param name="projectName">The name of the project file.</param>
         /// <param name="log">An <see cref="NuGet.Common.ILogger"/> object used to log messages.</param>
         /// <returns>A <see cref="Tuple{ProjectStyle, Boolean}"/> containing the project style and a value indicating if the project is using a style that is compatible with PackageReference.
         /// If the value of <paramref name="restoreProjectStyle"/> is not empty and could not be parsed, <code>null</code> is returned.</returns>
-        public static (ProjectStyle ProjectStyle, bool IsPackageReferenceCompatibleProjectStyle, string PackagesConfigFilePath) GetProjectRestoreStyle(string restoreProjectStyle, bool hasPackageReferenceItems, string projectJsonPath, string projectDirectory, string projectName, Common.ILogger log)
+        public static (ProjectStyle ProjectStyle, string PackagesConfigFilePath) GetProjectRestoreStyle(string restoreProjectStyle, bool hasPackageReferenceItems, string projectDirectory, string projectName, Common.ILogger log)
         {
-            return GetProjectRestoreStyle(GetProjectRestoreStyleFromProjectProperty(restoreProjectStyle), hasPackageReferenceItems, projectJsonPath, projectDirectory, projectName, log);
+            return GetProjectRestoreStyle(GetProjectRestoreStyleFromProjectProperty(restoreProjectStyle), hasPackageReferenceItems, projectDirectory, projectName, log);
         }
 
         /// <summary>

@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using FluentAssertions;
+using Microsoft.Internal.NuGet.Testing.SignedPackages.ChildProcess;
 using NuGet.Common;
 using NuGet.Test.Utility;
 using Xunit;
@@ -65,7 +66,7 @@ namespace NuGet.XPlat.FuncTest
                 // Act
                 var result = CommandRunner.Run(
                     DotnetCli,
-                    Directory.GetCurrentDirectory(),
+                    mockBaseDirectory,
                     $"{XplatDll} {args}",
                     environmentVariables: new Dictionary<string, string>
                     {
@@ -126,7 +127,7 @@ namespace NuGet.XPlat.FuncTest
                 // Act
                 var result = CommandRunner.Run(
                     DotnetCli,
-                    Directory.GetCurrentDirectory(),
+                    mockBaseDirectory,
                     $"{XplatDll} {args}",
                     environmentVariables: new Dictionary<string, string>
                     {
@@ -227,7 +228,7 @@ namespace NuGet.XPlat.FuncTest
             // Act
             var result = CommandRunner.Run(
                 DotnetCli,
-                Directory.GetCurrentDirectory(),
+                Path.GetDirectoryName(XplatDll),
                 $"{XplatDll} {args}",
                 testOutputHelper: _testOutputHelper);
 
@@ -251,7 +252,7 @@ namespace NuGet.XPlat.FuncTest
             // Act
             var result = CommandRunner.Run(
                 DotnetCli,
-                Directory.GetCurrentDirectory(),
+                Path.GetDirectoryName(XplatDll),
                 $"{XplatDll} {args}",
                 testOutputHelper: _testOutputHelper);
 
@@ -275,7 +276,7 @@ namespace NuGet.XPlat.FuncTest
             // Act
             var result = CommandRunner.Run(
                 DotnetCli,
-                Directory.GetCurrentDirectory(),
+                Path.GetDirectoryName(XplatDll),
                 $"{XplatDll} {args}",
                 testOutputHelper: _testOutputHelper);
 
@@ -300,7 +301,7 @@ namespace NuGet.XPlat.FuncTest
             // Act
             var result = CommandRunner.Run(
                 DotnetCli,
-                Directory.GetCurrentDirectory(),
+                Path.GetDirectoryName(XplatDll),
                 $"{XplatDll} {args}",
                 testOutputHelper: _testOutputHelper);
 
@@ -331,7 +332,7 @@ namespace NuGet.XPlat.FuncTest
             // Act
             var result = CommandRunner.Run(
                 DotnetCli,
-                Directory.GetCurrentDirectory(),
+                Path.GetDirectoryName(XplatDll),
                 $"{XplatDll} {args}",
                 testOutputHelper: _testOutputHelper);
 

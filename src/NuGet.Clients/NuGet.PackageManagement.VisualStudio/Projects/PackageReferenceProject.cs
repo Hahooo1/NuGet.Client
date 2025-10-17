@@ -39,10 +39,6 @@ namespace NuGet.PackageManagement.VisualStudio
 
         private static readonly ProjectPackages EmptyProjectPackages = new(Array.Empty<PackageReference>(), Array.Empty<TransitivePackageReference>());
 
-        private readonly protected string _projectName;
-        private readonly protected string _projectUniqueName;
-        private readonly protected string _projectFullPath;
-
         // Cache
         private protected Dictionary<string, TransitiveEntry> TransitiveOriginsCache { get; set; }
         protected T InstalledPackages { get; set; }
@@ -90,7 +86,7 @@ namespace NuGet.PackageManagement.VisualStudio
         }
 
         /// <summary>
-        /// Gets the installed (top level) package references for this project. 
+        /// Gets the installed (top level) package references for this project.
         /// </summary>
         public override async Task<IEnumerable<PackageReference>> GetInstalledPackagesAsync(CancellationToken token)
         {
@@ -220,23 +216,14 @@ namespace NuGet.PackageManagement.VisualStudio
                         }
 
                         // If the project has project references, we need to compute transitive origins for their packages
-                        List<LockFileTargetLibrary> projectReferences = targetsList.SelectMany(t => t.Libraries).Where(l => l.Type == LibraryType.Project).ToList();
-                        List<PackageReference> calculatedLibraryReferences = new List<PackageReference>(projectReferences.Count + calculatedInstalledPackages.Count);
-                        if (projectReferences.Count > 0)
-                        {
-                            foreach (var projectReference in projectReferences)
-                            {
-                                var packageReference = new PackageReference(
-                                    identity: new PackageIdentity(projectReference.Name, projectReference.Version),
-                                    targetFramework: new NuGetFramework(projectReference.Framework),
-                                    userInstalled: false,
-                                    developmentDependency: false,
-                                    requireReinstallation: false,
-                                    allowedVersions: new VersionRange(projectReference.Version));
-                                calculatedLibraryReferences.Add(packageReference);
-                            }
-                        }
+                        List<PackageReference> projectReferences = packageSpec
+                            .TargetFrameworks
+                            .SelectMany(f => GetProjectPackageReferences(f.FrameworkName, targetsList))
+                            .GroupBy(p => p.PackageIdentity)
+                            .Select(g => g.OrderBy(p => p.TargetFramework, FrameworkSorter).First())
+                            .ToList();
 
+                        List<PackageReference> calculatedLibraryReferences = new List<PackageReference>(projectReferences);
                         calculatedLibraryReferences.AddRange(calculatedInstalledPackages);
 
                         // Compute Transitive Origins
@@ -296,6 +283,29 @@ namespace NuGet.PackageManagement.VisualStudio
             IsInstalledAndTransitiveComputationNeeded = false;
 
             return new ProjectPackages(calculatedInstalledPackages, transitivePkgsResult);
+        }
+
+
+        private static IEnumerable<PackageReference> GetProjectPackageReferences(NuGetFramework nuGetFramework, IList<LockFileTarget> targetsList)
+        {
+            if (targetsList is null)
+            {
+                return Enumerable.Empty<PackageReference>();
+            }
+
+            var packageReferences = targetsList
+                .Where(t => t.TargetFramework.Equals(nuGetFramework))
+                .SelectMany(lib => lib.Libraries)
+                .Where(l => l.Type == "project")
+                .Select(package => new PackageReference(
+                    new PackageIdentity(package.Name, package.Version),
+                    targetFramework: nuGetFramework,
+                    userInstalled: false,
+                    developmentDependency: false,
+                    requireReinstallation: false,
+                    allowedVersions: new VersionRange(package.Version)));
+
+            return packageReferences;
         }
 
         protected abstract IEnumerable<PackageReference> ResolvedInstalledPackagesList(IEnumerable<LibraryDependency> libraries, NuGetFramework targetFramework, IList<LockFileTarget> targets, T installedPackages);
@@ -470,27 +480,29 @@ namespace NuGet.PackageManagement.VisualStudio
                 visited.Add(current.PackageIdentity); // visited
 
                 // Lookup Transitive Origins Cache
-                TransitiveEntry cachedEntry;
-                if (!transitiveOriginsCache.TryGetValue(current.PackageIdentity.Id, out cachedEntry))
+                if (transitiveOriginsCache.TryGetValue(current.PackageIdentity.Id, out TransitiveEntry cachedEntry))
+                {
+                    if (cachedEntry.TryGetValue(fxRidEntry, out var packageReferences))
+                    {
+                        // Dictionary value is a List. If perf. is bad, change to HashSet.
+                        if (!packageReferences.Contains(top))
+                        {
+                            packageReferences.Add(top);
+                        }
+                    }
+                    else
+                    {
+                        cachedEntry[fxRidEntry] = [top];
+                    }
+                }
+                else
                 {
                     cachedEntry = new Dictionary<FrameworkRuntimePair, IList<PackageReference>>
                     {
-                        [fxRidEntry] = new List<PackageReference>()
+                        {fxRidEntry, [top]}
                     };
+                    transitiveOriginsCache[current.PackageIdentity.Id] = cachedEntry;
                 }
-
-                if (!cachedEntry.ContainsKey(fxRidEntry))
-                {
-                    cachedEntry[fxRidEntry] = new List<PackageReference>();
-                }
-
-                if (!cachedEntry[fxRidEntry].Contains(top)) // Dictionary value is a List. If perf. is bad, change to HashSet.
-                {
-                    cachedEntry[fxRidEntry].Add(top);
-                }
-
-                // Upsert Transitive Origins Cache
-                transitiveOriginsCache[current.PackageIdentity.Id] = cachedEntry;
 
                 foreach (PackageDependency dep in node.Dependencies.ToList()) // Casting to list to prevent backing allocations
                 {

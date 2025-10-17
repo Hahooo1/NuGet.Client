@@ -12,6 +12,8 @@ using NuGet.Packaging.Core;
 using NuGet.Packaging.PackageCreation.Resources;
 using NuGet.Packaging.Xml;
 using static NuGet.Shared.XmlUtility;
+using NuGet.Versioning;
+
 
 #if !IS_CORECLR
 using System.Xml.Schema;
@@ -143,6 +145,16 @@ namespace NuGet.Packaging
             // Deserialize it
             var manifest = ManifestReader.ReadManifest(document);
 
+            // Update manifest metadata version if version was provided by the CLI command
+            if (propertyProvider is not null && propertyProvider.Target.GetType().Name.Equals("PackArgs"))
+            {
+                var versionProperty = propertyProvider.Target.GetType().GetProperty("Version");
+                if (versionProperty?.GetValue(propertyProvider.Target) is string version)
+                {
+                    manifest.Metadata.Version = NuGetVersion.Parse(version);
+                }
+            }
+
             // Validate before returning
             Validate(manifest);
 
@@ -228,6 +240,7 @@ namespace NuGet.Packaging
 #endif
         }
 
+#if !IS_CORECLR 
         private static string GetPackageId(XElement metadataElement)
         {
             XName idName = XName.Get("id", metadataElement.Document.Root.Name.NamespaceName);
@@ -248,6 +261,7 @@ namespace NuGet.Packaging
 
             return document.Root.Element(metadataName);
         }
+#endif
 
         public static void Validate(Manifest manifest)
         {

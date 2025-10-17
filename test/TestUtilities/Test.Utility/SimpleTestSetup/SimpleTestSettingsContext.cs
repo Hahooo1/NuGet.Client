@@ -13,6 +13,8 @@ namespace NuGet.Test.Utility
 {
     public class SimpleTestSettingsContext
     {
+        public const string DefaultPackageSourceName = "source";
+
         /// <summary>
         /// NuGet.Config path on disk
         /// </summary>
@@ -93,7 +95,7 @@ namespace NuGet.Test.Utility
             var doc = GetEmptyConfig();
 
             var packageSources = GetOrAddSection(doc, "packageSources");
-            AddEntry(packageSources, "source", packageSource);
+            AddEntry(packageSources, DefaultPackageSourceName, packageSource);
 
             var fallbackFolders = GetOrAddSection(doc, "fallbackPackageFolders");
             AddEntry(fallbackFolders, "shared", fallbackFolder);
@@ -112,11 +114,13 @@ namespace NuGet.Test.Utility
 
             var config = GetOrAddSection(doc, "config");
             var packageSources = GetOrAddSection(doc, "packageSources");
+            var auditSources = GetOrAddSection(doc, "auditSources");
             var disabledSources = GetOrAddSection(doc, "disabledPackageSources");
             var fallbackFolders = GetOrAddSection(doc, "fallbackPackageFolders");
             var packageSourceMapping = GetOrAddSection(doc, "packageSourceMapping");
 
             packageSources.Add(new XElement(XName.Get("clear")));
+            auditSources.Add(new XElement(XName.Get("clear")));
             disabledSources.Add(new XElement(XName.Get("clear")));
             packageSourceMapping.Add(new XElement(XName.Get("clear")));
 
@@ -201,7 +205,7 @@ namespace NuGet.Test.Utility
         {
             var config = GetOrAddSection(doc, "config");
 
-            foreach (var item in config.Elements(XName.Get("add")).Where(e => e.Name.LocalName.Equals(key, StringComparison.OrdinalIgnoreCase)).ToArray())
+            foreach (var item in config.Elements(XName.Get("add")).Where(e => e.FirstAttribute.Value.Equals(key, StringComparison.OrdinalIgnoreCase)).ToArray())
             {
                 item.Remove();
             }
@@ -252,6 +256,13 @@ namespace NuGet.Test.Utility
         {
             var section = GetOrAddSection(XML, "packageSources");
             AddEntry(section, sourceName, sourceUri, attributeName, attributeValue);
+            Save();
+        }
+
+        public void AddAuditSource(string sourceName, string sourceUri, string allowInsecureConnectionsValue)
+        {
+            var section = GetOrAddSection(XML, "auditSources");
+            AddEntry(section, sourceName, sourceUri, "allowInsecureConnections", allowInsecureConnectionsValue);
             Save();
         }
 

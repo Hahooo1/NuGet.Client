@@ -16,6 +16,9 @@ namespace NuGet.Tests.Apex.Daily
     [TestClass]
     public class NuGetConsoleTestCase : SharedVisualStudioHostTestClass
     {
+        private const string AndroidFeedName = "AndroidFeed";
+        private const string AndroidFeedUrl = "https://pkgs.dev.azure.com/dnceng/public/_packaging/darc-pub-dotnet-android-a8cd27e4/nuget/v3/index.json";
+
         [DataTestMethod]
         [DataRow(ProjectTemplate.NetCoreConsoleApp)]
         [DataRow(ProjectTemplate.ConsoleApplication)]
@@ -24,7 +27,6 @@ namespace NuGet.Tests.Apex.Daily
         public async Task VerifyCacheFileInsideObjFolder(ProjectTemplate projectTemplate)
         {
             // Arrange
-            EnsureVisualStudioHost();
             using (var simpleTestPathContext = new SimpleTestPathContext())
             {
                 simpleTestPathContext.Settings.SetPackageFormatToPackageReference();
@@ -60,7 +62,6 @@ namespace NuGet.Tests.Apex.Daily
         [Timeout(DefaultTimeout)]
         public async Task UpdateAllPackagesInPMC(ProjectTemplate projectTemplate, string packageName1, string packageVersion1, string packageVersion2, string packageName2, string packageVersion3, string packageVersion4)
         {
-            EnsureVisualStudioHost();
             using (var simpleTestPathContext = new SimpleTestPathContext())
             {
                 // Arrange
@@ -71,7 +72,6 @@ namespace NuGet.Tests.Apex.Daily
 
                 using (var testContext = new ApexTestContext(VisualStudio, projectTemplate, Logger, addNetStandardFeeds: true, simpleTestPathContext: simpleTestPathContext))
                 {
-                    var solutionService = VisualStudio.Get<SolutionService>();
                     var nugetConsole = GetConsole(testContext.Project);
 
                     // Act
@@ -92,8 +92,8 @@ namespace NuGet.Tests.Apex.Daily
                     }
                     else
                     {
-                        CommonUtility.AssertPackageReferenceExists(VisualStudio, testContext.Project, packageName1, packageVersion2, Logger);
-                        CommonUtility.AssertPackageReferenceExists(VisualStudio, testContext.Project, packageName2, packageVersion4, Logger);
+                        CommonUtility.AssertPackageReferenceExists(testContext.Project, packageName1, packageVersion2, Logger);
+                        CommonUtility.AssertPackageReferenceExists(testContext.Project, packageName2, packageVersion4, Logger);
                     }
                     VisualStudio.AssertNuGetOutputDoesNotHaveErrors();
                     Assert.IsTrue(VisualStudio.HasNoErrorsInOutputWindows());
@@ -106,7 +106,6 @@ namespace NuGet.Tests.Apex.Daily
         [Timeout(DefaultTimeout)]
         public async Task InstallPackageForPRInPMC(ProjectTemplate projectTemplate)
         {
-            EnsureVisualStudioHost();
             using (var simpleTestPathContext = new SimpleTestPathContext())
             {
                 // Arrange
@@ -114,11 +113,11 @@ namespace NuGet.Tests.Apex.Daily
                 var v100 = "1.0.0";
                 await CommonUtility.CreatePackageInSourceAsync(simpleTestPathContext.PackageSource, packageName, v100);
                 simpleTestPathContext.Settings.AddSource(NuGetConstants.NuGetHostName, NuGetConstants.V3FeedUrl);
+                simpleTestPathContext.Settings.AddSource(AndroidFeedName, AndroidFeedUrl);
 
                 using (var testContext = new ApexTestContext(VisualStudio, projectTemplate, Logger, simpleTestPathContext: simpleTestPathContext))
                 {
                     VisualStudio.AssertNoErrors();
-                    var solutionService = VisualStudio.Get<SolutionService>();
                     testContext.SolutionService.Build();
 
                     // Act
@@ -141,7 +140,6 @@ namespace NuGet.Tests.Apex.Daily
         [Timeout(DefaultTimeout)]
         public async Task UpdatePackageForPRInPMC(ProjectTemplate projectTemplate)
         {
-            EnsureVisualStudioHost();
             using (var simpleTestPathContext = new SimpleTestPathContext())
             {
                 // Arrange
@@ -152,11 +150,11 @@ namespace NuGet.Tests.Apex.Daily
                 await CommonUtility.CreatePackageInSourceAsync(simpleTestPathContext.PackageSource, packageName, v100);
                 await CommonUtility.CreatePackageInSourceAsync(simpleTestPathContext.PackageSource, packageName, v200);
                 simpleTestPathContext.Settings.AddSource(NuGetConstants.NuGetHostName, NuGetConstants.V3FeedUrl);
+                simpleTestPathContext.Settings.AddSource(AndroidFeedName, AndroidFeedUrl);
 
                 using (var testContext = new ApexTestContext(VisualStudio, projectTemplate, Logger, simpleTestPathContext: simpleTestPathContext))
                 {
                     VisualStudio.AssertNoErrors();
-                    var solutionService = VisualStudio.Get<SolutionService>();
                     testContext.SolutionService.Build();
 
                     // Act
@@ -183,7 +181,6 @@ namespace NuGet.Tests.Apex.Daily
         [Timeout(DefaultTimeout)]
         public async Task UninstallPackageForPRInPMC(ProjectTemplate projectTemplate)
         {
-            EnsureVisualStudioHost();
             using (var simpleTestPathContext = new SimpleTestPathContext())
             {
                 // Arrange
@@ -192,11 +189,11 @@ namespace NuGet.Tests.Apex.Daily
 
                 await CommonUtility.CreatePackageInSourceAsync(simpleTestPathContext.PackageSource, PackageName, v100);
                 simpleTestPathContext.Settings.AddSource(NuGetConstants.NuGetHostName, NuGetConstants.V3FeedUrl);
+                simpleTestPathContext.Settings.AddSource(AndroidFeedName, AndroidFeedUrl);
 
                 using (var testContext = new ApexTestContext(VisualStudio, projectTemplate, Logger, simpleTestPathContext: simpleTestPathContext))
                 {
                     VisualStudio.AssertNoErrors();
-                    var solutionService = VisualStudio.Get<SolutionService>();
                     testContext.SolutionService.Build();
                     testContext.NuGetApexTestService.WaitForAutoRestore();
 
@@ -224,7 +221,6 @@ namespace NuGet.Tests.Apex.Daily
         [Timeout(DefaultTimeout)]
         public async Task InstallPackageForPCInPMC(ProjectTemplate projectTemplate)
         {
-            EnsureVisualStudioHost();
             using (var simpleTestPathContext = new SimpleTestPathContext())
             {
                 // Arrange
@@ -235,7 +231,6 @@ namespace NuGet.Tests.Apex.Daily
                 using (var testContext = new ApexTestContext(VisualStudio, projectTemplate, Logger, simpleTestPathContext: simpleTestPathContext))
                 {
                     VisualStudio.AssertNoErrors();
-                    var solutionService = VisualStudio.Get<SolutionService>();
                     testContext.SolutionService.Build();
 
                     // Act
@@ -257,7 +252,6 @@ namespace NuGet.Tests.Apex.Daily
         [Timeout(DefaultTimeout)]
         public async Task UpdatePackageForPCInPMC(ProjectTemplate projectTemplate)
         {
-            EnsureVisualStudioHost();
             using (var simpleTestPathContext = new SimpleTestPathContext())
             {
                 // Arrange
@@ -271,7 +265,6 @@ namespace NuGet.Tests.Apex.Daily
                 using (var testContext = new ApexTestContext(VisualStudio, projectTemplate, Logger, simpleTestPathContext: simpleTestPathContext))
                 {
                     VisualStudio.AssertNoErrors();
-                    var solutionService = VisualStudio.Get<SolutionService>();
                     testContext.SolutionService.Build();
 
                     // Act
@@ -296,7 +289,6 @@ namespace NuGet.Tests.Apex.Daily
         [Timeout(DefaultTimeout)]
         public async Task UninstallPackageForPCInPMC(ProjectTemplate projectTemplate)
         {
-            EnsureVisualStudioHost();
             using (var simpleTestPathContext = new SimpleTestPathContext())
             {
                 // Arrange
@@ -308,7 +300,6 @@ namespace NuGet.Tests.Apex.Daily
                 using (var testContext = new ApexTestContext(VisualStudio, projectTemplate, Logger, simpleTestPathContext: simpleTestPathContext))
                 {
                     VisualStudio.AssertNoErrors();
-                    var solutionService = VisualStudio.Get<SolutionService>();
                     testContext.SolutionService.Build();
 
                     // Act
@@ -333,7 +324,6 @@ namespace NuGet.Tests.Apex.Daily
         [Timeout(DefaultTimeout)]
         public async Task InstallLatestPackageInPMC(ProjectTemplate projectTemplate)
         {
-            EnsureVisualStudioHost();
             using (var simpleTestPathContext = new SimpleTestPathContext())
             {
                 // Arrange
@@ -345,7 +335,6 @@ namespace NuGet.Tests.Apex.Daily
 
                 using (var testContext = new ApexTestContext(VisualStudio, projectTemplate, Logger, addNetStandardFeeds: true, simpleTestPathContext: simpleTestPathContext))
                 {
-                    var solutionService = VisualStudio.Get<SolutionService>();
                     var nugetConsole = GetConsole(testContext.Project);
 
                     // Act
@@ -360,7 +349,7 @@ namespace NuGet.Tests.Apex.Daily
                     }
                     else
                     {
-                        CommonUtility.AssertPackageReferenceExists(VisualStudio, testContext.Project, packageName, v200, Logger);
+                        CommonUtility.AssertPackageReferenceExists(testContext.Project, packageName, v200, Logger);
                     }
                     VisualStudio.AssertNuGetOutputDoesNotHaveErrors();
                     Assert.IsTrue(VisualStudio.HasNoErrorsInOutputWindows());
@@ -373,11 +362,9 @@ namespace NuGet.Tests.Apex.Daily
         [Timeout(DefaultTimeout)]
         public void VerifyInitScriptsExecution(ProjectTemplate projectTemplate)
         {
-            EnsureVisualStudioHost();
             using (var testContext = new ApexTestContext(VisualStudio, projectTemplate, Logger))
             {
                 // Arrange
-                SolutionService solutionService = VisualStudio.Get<SolutionService>();
                 var nugetConsole = GetConsole(testContext.Project);
                 var source = NuGetConstants.V3FeedUrl;
 
@@ -409,7 +396,6 @@ namespace NuGet.Tests.Apex.Daily
         [Timeout(DefaultTimeout)]
         public async Task VerifyCmdFindPackageExactMatchInPMC()
         {
-            EnsureVisualStudioHost();
             using (var simpleTestPathContext = new SimpleTestPathContext())
             {
                 // Arrange
@@ -419,7 +405,6 @@ namespace NuGet.Tests.Apex.Daily
 
                 using (var testContext = new ApexTestContext(VisualStudio, ProjectTemplate.NetCoreConsoleApp, Logger, addNetStandardFeeds: true, simpleTestPathContext: simpleTestPathContext))
                 {
-                    SolutionService solutionService = VisualStudio.Get<SolutionService>();
                     var nugetConsole = GetConsole(testContext.Project);
 
                     // Act
@@ -437,7 +422,6 @@ namespace NuGet.Tests.Apex.Daily
         [Timeout(DefaultTimeout)]
         public async Task VerifyCmdGetPackageUpdateInPMC()
         {
-            EnsureVisualStudioHost();
             using (var simpleTestPathContext = new SimpleTestPathContext())
             {
                 // Arrange
@@ -450,7 +434,6 @@ namespace NuGet.Tests.Apex.Daily
                 using (var testContext = new ApexTestContext(VisualStudio, ProjectTemplate.NetCoreConsoleApp, Logger, addNetStandardFeeds: true, simpleTestPathContext: simpleTestPathContext))
                 {
                     // Arrange
-                    SolutionService solutionService = VisualStudio.Get<SolutionService>();
                     var nugetConsole = GetConsole(testContext.Project);
 
                     nugetConsole.InstallPackageFromPMC(packageName, v100);
@@ -472,11 +455,9 @@ namespace NuGet.Tests.Apex.Daily
         [Timeout(DefaultTimeout)]
         public void VerifyCmdGetProjectInPMC()
         {
-            EnsureVisualStudioHost();
             using (var testContext = new ApexTestContext(VisualStudio, ProjectTemplate.ClassLibrary, Logger))
             {
                 // Arrange
-                SolutionService solutionService = VisualStudio.Get<SolutionService>();
                 var nugetConsole = GetConsole(testContext.Project);
 
                 //Act

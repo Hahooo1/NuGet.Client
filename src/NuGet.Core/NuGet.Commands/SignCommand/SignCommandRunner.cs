@@ -41,6 +41,10 @@ namespace NuGet.Commands
             {
                 success = false;
                 ExceptionUtilities.LogException(e, signArgs.Logger);
+                if (e is System.Security.Cryptography.CryptographicException ce)
+                {
+                    signArgs.Logger.LogError(ce.HResult.ToString(CultureInfo.InvariantCulture));
+                }
             }
 
             if (success)
@@ -231,6 +235,7 @@ namespace NuGet.Commands
             return matchingCertCollection[0];
         }
 
+#if IS_DESKTOP
         private static X509Certificate2Collection FilterCodeSigningCertificates(X509Certificate2Collection matchingCollection)
         {
             var filteredCollection = new X509Certificate2Collection();
@@ -245,5 +250,6 @@ namespace NuGet.Commands
 
             return filteredCollection;
         }
+#endif
     }
 }

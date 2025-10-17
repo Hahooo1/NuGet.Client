@@ -1,6 +1,7 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
+#nullable enable
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
@@ -8,6 +9,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using FluentAssertions;
+using Microsoft.Internal.NuGet.Testing.SignedPackages.ChildProcess;
 using NuGet.Common;
 using NuGet.Frameworks;
 using NuGet.Packaging;
@@ -288,12 +290,12 @@ namespace NuGet.CommandLine.Test
                     "proj2.csproj",
                     Util.CreateProjFileContent());
 
-                Util.CreateFile(solutionDirectory, "a.sln",
-                    Util.CreateSolutionFileContent());
+                Util.CreateFile(solutionDirectory, "a.slnx",
+                    Util.CreateSlnxFileContent());
 
                 var projectFile1 = Path.Combine(projectDirectory1, "proj1.csproj");
                 var projectFile2 = Path.Combine(projectDirectory2, "proj2.csproj");
-                var solutionFile = Path.Combine(solutionDirectory, "a.sln");
+                var solutionFile = Path.Combine(solutionDirectory, "a.slnx");
 
                 var testNuGetProjectContext = new TestNuGetProjectContext();
                 var msbuildDirectory = MsBuildUtility.GetMsBuildToolset(null, null).Path;
@@ -576,6 +578,88 @@ namespace NuGet.CommandLine.Test
 
                 var projectFile = Path.Combine(projectDirectory, "proj1.csproj");
                 var solutionFile = Path.Combine(solutionDirectory, "a.sln");
+
+                var testNuGetProjectContext = new TestNuGetProjectContext();
+                var msbuildDirectory = MsBuildUtility.GetMsBuildToolset(null, null).Path;
+                var projectSystem = new MSBuildProjectSystem(msbuildDirectory, projectFile, testNuGetProjectContext);
+                var msBuildProject = new MSBuildNuGetProject(projectSystem, packagesDirectory, projectDirectory);
+                using (var stream = File.OpenRead(a1Package))
+                {
+                    var downloadResult = new DownloadResourceResult(stream, packagesSourceDirectory);
+                    await msBuildProject.InstallPackageAsync(
+                        a1,
+                        downloadResult,
+                        testNuGetProjectContext,
+                        CancellationToken.None);
+                }
+
+                var args = new[]
+                {
+                    "update",
+                    solutionFile,
+                    "-Source",
+                    packagesSourceDirectory,
+                    "-Prerelease",
+                };
+
+                var r = CommandRunner.Run(
+                    Util.GetNuGetExePath(),
+                    workingPath,
+                    string.Join(" ", args),
+                    testOutputHelper: _testOutputHelper);
+
+                Assert.True(r.ExitCode == 0, "Output is " + r.Output + ". Error is " + r.Errors);
+
+                var content = File.ReadAllText(projectFile);
+                Assert.False(content.Contains(Util.GetHintPath(Path.Combine("packages", "A.1.0.0", "lib", "net45", "file.dll"))));
+                Assert.True(content.Contains(Util.GetHintPath(Path.Combine("packages", "A.2.0.0-BETA", "lib", "net45", "file.dll"))));
+            }
+        }
+
+        [Fact]
+        public async Task UpdateCommand_Success_Prerelease_Slnx()
+        {
+            using (var pathContext = new SimpleTestPathContext())
+            {
+                //Arrange
+                var packagesDirectory = pathContext.PackagesV2;
+                var solutionDirectory = pathContext.SolutionRoot;
+                var packagesSourceDirectory = pathContext.PackageSource;
+                var workingPath = pathContext.WorkingDirectory;
+                var projectDirectory = Path.Combine(solutionDirectory, "proj1");
+
+                var a1 = new PackageIdentity("A", new NuGetVersion("1.0.0"));
+                var a2 = new PackageIdentity("A", new NuGetVersion("2.0.0-BETA"));
+
+                var a1Package = Util.CreateTestPackage(
+                    a1.Id,
+                    a1.Version.ToString(),
+                    packagesSourceDirectory,
+                    new List<NuGetFramework>() { NuGetFramework.Parse("net45") },
+                    new List<PackageDependencyGroup>() { });
+
+
+                var a2Package = Util.CreateTestPackage(
+                    a2.Id,
+                    a2.Version.ToString(),
+                    packagesSourceDirectory,
+                    new List<NuGetFramework>() { NuGetFramework.Parse("net45") },
+                    new List<PackageDependencyGroup>() { });
+
+                var packagesFolder = PathUtility.GetRelativePath(projectDirectory, packagesDirectory);
+
+                Directory.CreateDirectory(projectDirectory);
+                // create project 1
+                Util.CreateFile(
+                    projectDirectory,
+                    "proj1.csproj",
+                    Util.CreateProjFileContent());
+
+                Util.CreateFile(solutionDirectory, "a.slnx",
+                    Util.CreateSlnxFileContent());
+
+                var projectFile = Path.Combine(projectDirectory, "proj1.csproj");
+                var solutionFile = Path.Combine(solutionDirectory, "a.slnx");
 
                 var testNuGetProjectContext = new TestNuGetProjectContext();
                 var msbuildDirectory = MsBuildUtility.GetMsBuildToolset(null, null).Path;
@@ -1579,7 +1663,7 @@ namespace NuGet.CommandLine.Test
         [InlineData("Highest", "2.0.0")]
         [InlineData("HighestMinor", "1.2.0")]
         [InlineData("HighestPatch", "1.0.1")]
-        public async Task UpdateCommand_DependencyResolution_Success(string dependencyVersion, string expectedVersion)
+        public async Task UpdateCommand_DependencyResolution_Success(string? dependencyVersion, string expectedVersion)
         {
             using (var pathContext = new SimpleTestPathContext())
             {
@@ -1630,7 +1714,7 @@ namespace NuGet.CommandLine.Test
                         testNuGetProjectContext,
                         CancellationToken.None);
                 }
-                string[] args;
+                string?[] args;
                 //Test the case where the code is not provided to ensure it works as expected. (Highest by default)
                 if (string.IsNullOrEmpty(dependencyVersion))
                 {
@@ -1901,7 +1985,7 @@ namespace NuGet.CommandLine.Test
 </packages>");
 
             solution.Projects.Add(projectA);
-            solution.Create(pathContext.SolutionRoot);
+            solution.Create();
 
             var args = new[]
             {
@@ -1974,7 +2058,7 @@ namespace NuGet.CommandLine.Test
 </packages>");
 
             solution.Projects.Add(projectB);
-            solution.Create(pathContext.SolutionRoot);
+            solution.Create();
 
             var args = new[]
             {

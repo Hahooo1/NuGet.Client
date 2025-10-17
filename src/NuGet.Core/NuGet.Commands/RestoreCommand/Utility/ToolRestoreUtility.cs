@@ -4,7 +4,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using NuGet.Common;
 using NuGet.Configuration;
 using NuGet.Frameworks;
 using NuGet.LibraryModel;
@@ -30,20 +29,19 @@ namespace NuGet.Commands
             {
                 Name = name, // make sure this package never collides with a dependency
                 FilePath = projectFilePath,
-                Dependencies = new List<LibraryDependency>(),
                 TargetFrameworks =
                 {
                     new TargetFrameworkInformation
                     {
                         TargetAlias = frameworkShortFolderName,
                         FrameworkName = framework,
-                        Dependencies = new List<LibraryDependency>
-                        {
-                            new LibraryDependency(noWarn: Array.Empty<NuGetLogCode>())
+                        Dependencies =
+                        [
+                            new LibraryDependency()
                             {
                                 LibraryRange = new LibraryRange(id, versionRange, LibraryDependencyTarget.Package)
                             }
-                        }
+                        ]
                     }
                 },
                 RestoreMetadata = new ProjectRestoreMetadata()
@@ -162,7 +160,7 @@ namespace NuGet.Commands
                 return null;
             }
 
-            return spec.Dependencies.Concat(spec.TargetFrameworks.SelectMany(e => e.Dependencies)).SingleOrDefault();
+            return spec.TargetFrameworks.SelectMany(e => e.Dependencies).SingleOrDefault();
         }
 
         public static LockFileTargetLibrary GetToolTargetLibrary(LockFile toolLockFile, string toolId)

@@ -5,6 +5,7 @@ using System;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using Microsoft.Internal.NuGet.Testing.SignedPackages.ChildProcess;
 using NuGet.CommandLine.XPlat;
 using NuGet.Configuration;
 using NuGet.Test.Utility;
@@ -270,6 +271,7 @@ namespace NuGet.XPlat.FuncTest
         [Theory]
         [InlineData("signatureValidationMode", "accept")]
         [InlineData("maxHttpRequestsPerSource", "64")]
+        [InlineData("updatePackageLastAccessTime", "true")]
         public void ConfigSetCommand_WithConfigFileArg_AddsSetting(string key, string value)
         {
             // Arrange & Act
@@ -496,7 +498,7 @@ namespace NuGet.XPlat.FuncTest
         }
 
         [Fact]
-        public void ConfigGetCommand_WithInvalidConfigKeyArg_ThrowsCommandException()
+        public void ConfigGetCommand_WithInvalidConfigKeyArg_OutputsErrorMessage()
         {
             // Arrange & Act
             using var testInfo = new TestInfo("NuGet.Config");
@@ -514,7 +516,7 @@ namespace NuGet.XPlat.FuncTest
         }
 
         [Fact]
-        public void ConfigGetCommand_WithNullAllOrConfigKeyArg_ThrowsCommandException()
+        public void ConfigGetCommand_WithoutConfigKeyArg_OutputsErrorMessage()
         {
             // Arrange & Act
             using var testInfo = new TestInfo("NuGet.Config");
@@ -524,7 +526,7 @@ namespace NuGet.XPlat.FuncTest
                 Directory.GetCurrentDirectory(),
                 $"{XplatDll} config get",
                 testOutputHelper: _testOutputHelper);
-            var expectedError = string.Format(CultureInfo.CurrentCulture, Strings.ConfigCommandKeyNotFound, "");
+            var expectedError = "Required argument missing";
 
             // Assert
             DotnetCliUtil.VerifyResultFailure(result, expectedError);

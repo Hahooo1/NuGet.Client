@@ -5,6 +5,7 @@ using System;
 using System.IO;
 using System.Linq;
 using FluentAssertions;
+using Microsoft.Internal.NuGet.Testing.SignedPackages.ChildProcess;
 using NuGet.Frameworks;
 using NuGet.Test.Utility;
 using Xunit;
@@ -52,7 +53,7 @@ namespace NuGet.XPlat.FuncTest
                 Assert.True(Array.Exists(files, element => element == filename));
             }
 
-            Assert.Equal(files.Count(), TestFileNames.Length);
+            Assert.Equal(files.Length, TestFileNames.Length);
         }
 
         /// <summary>
@@ -143,7 +144,7 @@ project TFMs found: {string.Join(", ", compiledTfms.Keys.Select(k => k.ToString(
         public static void VerifyResultFailure(CommandRunnerResult result, string expectedErrorMessage)
         {
             result.ExitCode.Should().NotBe(0);
-            result.Output.Should().Contain(expectedErrorMessage);
+            result.AllOutput.Should().Contain(expectedErrorMessage);
         }
     }
 }

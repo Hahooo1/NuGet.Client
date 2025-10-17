@@ -8,6 +8,7 @@ using System.Net;
 using System.Security.Principal;
 using System.Text;
 using FluentAssertions;
+using Microsoft.Internal.NuGet.Testing.SignedPackages.ChildProcess;
 using Newtonsoft.Json.Linq;
 using NuGet.Common;
 using NuGet.Configuration;
@@ -490,7 +491,7 @@ namespace NuGet.CommandLine.Test
             }
         }
 
-        [Fact]
+        [Fact(Skip = "https://github.com/NuGet/Home/issues/13864")]
         public void PushCommand_PushTimeoutErrorMessage()
         {
             using (TestDirectory packageDirectory = TestDirectory.Create())
@@ -502,7 +503,7 @@ namespace NuGet.CommandLine.Test
                 server.Get.Add("/push", r => "OK");
                 server.Put.Add("/push", r =>
                 {
-                    System.Threading.Thread.Sleep(2000);
+                    System.Threading.Thread.Sleep(TimeSpan.FromSeconds(10));
                     return HttpStatusCode.Created;
                 });
                 pathContext.Settings.AddSource("http-feed", $"{server.Uri}push", allowInsecureConnectionsValue: "true");
@@ -512,7 +513,7 @@ namespace NuGet.CommandLine.Test
                 CommandRunnerResult result = CommandRunner.Run(
                     Util.GetNuGetExePath(),
                     pathContext.WorkingDirectory,
-                    $"push {packageFileName} -Source {server.Uri}push -Timeout 1");
+                    $"push {packageFileName} -Source {server.Uri}push -Timeout 3");
 
                 // Assert
                 Assert.Equal(1, result.ExitCode);
@@ -2566,6 +2567,42 @@ $@"<configuration>
             // Assert
             result.Success.Should().BeTrue(result.AllOutput);
             Assert.DoesNotContain($"{server.Uri}push", result.Errors);
+        }
+
+        [Fact]
+        public void PushCommand_WhenPushingToAnHttpServerWithAllowInsecureConnectionsOptionTrue_Succeeds()
+        {
+            // Arrange
+            var nugetexe = Util.GetNuGetExePath();
+            using var packageDirectory = TestDirectory.Create();
+            var packageFileName = Util.CreateTestPackage("test", "1.1.0", packageDirectory);
+            var outputFileName = Path.Combine(packageDirectory, "t1.nupkg");
+
+            using var server = new MockServer();
+            server.Get.Add("/push", r => "OK");
+            server.Put.Add("/push", r =>
+            {
+                byte[] buffer = MockServer.GetPushedPackage(r);
+                using (var of = new FileStream(outputFileName, FileMode.Create))
+                {
+                    of.Write(buffer, 0, buffer.Length);
+                }
+
+                return HttpStatusCode.Created;
+            });
+
+            server.Start();
+
+            // Act
+            var result = CommandRunner.Run(
+                            nugetexe,
+                            Directory.GetCurrentDirectory(),
+                            $"push {packageFileName} -Source {server.Uri}push -AllowInsecureConnections");
+
+            // Assert
+            result.Success.Should().BeTrue(result.AllOutput);
+            Assert.DoesNotContain($"{server.Uri}push", result.Errors);
+            Assert.True(File.Exists(outputFileName), "The output file was not created as expected.");
         }
 
         [Fact]

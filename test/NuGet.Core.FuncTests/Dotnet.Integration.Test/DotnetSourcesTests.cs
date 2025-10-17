@@ -7,6 +7,7 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Xml.Linq;
+using Microsoft.Internal.NuGet.Testing.SignedPackages.ChildProcess;
 using NuGet.Commands;
 using NuGet.Common;
 using NuGet.Configuration;
@@ -345,7 +346,7 @@ namespace Dotnet.Integration.Test
                 List<PackageSource> httpPackageSources = new List<PackageSource>();
                 string expectedError = "";
 
-                for (int i = 0; i < httpSources.Count(); i++)
+                for (int i = 0; i < httpSources.Length; i++)
                 {
                     var source = httpSources[i];
                     httpPackageSources.Add(new PackageSource(source, $"source{i}"));

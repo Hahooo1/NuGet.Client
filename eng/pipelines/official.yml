@@ -6,27 +6,42 @@ parameters:
 - name: RunCrossFrameworkTestsOnWindows
   displayName: Run cross framework tests on Windows
   type: boolean
-  default: true
+  default: false
+- name: RunUnitTestsOnWindows
+  displayName: Run unit tests on Windows
+  type: boolean
+  default: false
 - name: RunFunctionalTestsOnWindows
   displayName: Run functional tests on Windows
   type: boolean
-  default: true
+  default: false
 - name: RunSourceBuild
   displayName: Run source build
   type: boolean
-  default: true
+  default: false
 - name: RunTestsOnLinux
   displayName: Run tests on Linux
   type: boolean
-  default: true
+  default: false
 - name: RunTestsOnMac
   displayName: Run tests on Mac
   type: boolean
-  default: true
+  default: false
 - name: RunMonoTestsOnMac
   displayName: Run Mono tests on Mac
   type: boolean
   default: false
+- name: RunStaticAnalysis
+  displayName: Run static analysis
+  type: boolean
+  default: false
+- name: SigningType
+  displayName: Type of signing to use
+  type: string
+  default: Real
+  values:
+  - Real
+  - Test
 
 resources:
   repositories:
@@ -43,11 +58,15 @@ variables:
   Codeql.TSAEnabled: true
   RunBuildForPublishing: ${{ parameters.RunBuildForPublishing }}
   RunCrossFrameworkTestsOnWindows: ${{ parameters.RunCrossFrameworkTestsOnWindows }}
+  RunUnitTestsOnWindows: ${{ parameters.RunUnitTestsOnWindows }}
   RunFunctionalTestsOnWindows: ${{ parameters.RunFunctionalTestsOnWindows }}
   RunSourceBuild: ${{ parameters.RunSourceBuild }}
   RunTestsOnLinux: ${{ parameters.RunTestsOnLinux }}
   RunTestsOnMac: ${{ parameters.RunTestsOnMac }}
   RunMonoTestsOnMac: ${{ parameters.RunMonoTestsOnMac }}
+  RunStaticAnalysis: ${{ parameters.RunStaticAnalysis }}
+  OneLocBranch: 'dev'
+  SourceBranch: $[replace(variables['Build.SourceBranch'], 'refs/heads/', '')]
 
 extends:
   template: azure-pipelines/MicroBuild.1ES.Official.yml@MicroBuildTemplate
@@ -58,24 +77,34 @@ extends:
         enabled: true
         scanOutputDirectoryOnly: true
       sbom:
-        enabled: false
+        enabled: true
       credscan:
         enabled: false
+      suppression:
+        suppressionFile: $(Build.SourcesDirectory)\.gdn\.gdnsuppress
     pool:
       name: AzurePipelines-EO
       image: 1ESPT-Windows2022
       os: windows
+    featureFlags:
+      enablePrepareFilesForSbom: true
     customBuildTags:
     - ES365AIMigrationTooling
     stages:
     - template: /eng/pipelines/templates/pipeline.yml@self
       parameters:
         isOfficialBuild: true
-        NuGetLocalizationType: Full
+        # Only run against dev.
+        # To request a change in localization branch, see https://github.com/dotnet/arcade/blob/main/Documentation/OneLocBuild.md#releasing-with-onelocbuild-using-arcade
+        ${{ if eq(variables['Build.SourceBranch'], format('refs/heads/{0}', variables['OneLocBranch'])) }}:
+          RunOneLocBuild: true
         RunBuildForPublishing: ${{parameters.RunBuildForPublishing}}
         RunCrossFrameworkTestsOnWindows: ${{parameters.RunCrossFrameworkTestsOnWindows}}
+        RunUnitTestsOnWindows: ${{parameters.RunUnitTestsOnWindows}}
         RunFunctionalTestsOnWindows: ${{parameters.RunFunctionalTestsOnWindows}}
         RunSourceBuild: ${{parameters.RunSourceBuild}}
         RunTestsOnLinux: ${{parameters.RunTestsOnLinux}}
         RunTestsOnMac: ${{parameters.RunTestsOnMac}}
         RunMonoTestsOnMac: ${{parameters.RunMonoTestsOnMac}}
+        RunStaticAnalysis: ${{parameters.RunStaticAnalysis}}
+        SigningType: ${{ parameters.SigningType }}

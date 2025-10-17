@@ -1,7 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFramework>$(NETCoreTargetFramework)</TargetFramework>
+    <TargetFramework>$(LatestNETCoreTargetFramework)</TargetFramework>
     <Description>Functional tests for nuget in dotnet CLI scenarios, using the NuGet.CommandLine.XPlat assembly.</Description>
+    <TestProjectType>Unit</TestProjectType>
   </PropertyGroup>
 
   <ItemGroup>
@@ -15,5 +16,9 @@
   <ItemGroup>
     <None Include="..\..\..\src\NuGet.Core\NuGet.Build.Tasks\NuGet.targets"
           CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+  
+  <ItemGroup>
+    <EmbeddedResource Include="compiler\resources\*" />
   </ItemGroup>
 </Project>

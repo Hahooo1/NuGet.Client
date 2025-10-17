@@ -12,14 +12,6 @@
     <PackageReference Include="Microsoft.VisualStudio.Sdk" />
   </ItemGroup>
 
-  <ItemGroup Label="transitive package pinning">
-    <!--
-      These packages are dependencies of the VS SDK
-      When it is upgraded to a newer version, try deleting the below PackageReference
-      -->
-    <PackageReference Include="Microsoft.IO.Redist" />
-  </ItemGroup>
-
   <ItemGroup>
     <ProjectReference Include="..\..\NuGet.Core\NuGet.PackageManagement\NuGet.PackageManagement.csproj" />
   </ItemGroup>
@@ -47,5 +39,6 @@
   <ItemGroup>
     <InternalsVisibleTo Include="NuGet.PackageManagement.VisualStudio.Test" />
     <InternalsVisibleTo Include="NuGet.VisualStudio.Internal.Contracts.Test" />
+    <InternalsVisibleTo Include="NuGet.PackageManagement.UI.Test"/>
   </ItemGroup>
 </Project>

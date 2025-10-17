@@ -2,6 +2,7 @@
   <PropertyGroup>
     <TargetFramework>$(NETFXTargetFramework)</TargetFramework>
     <Description>A functional (end-to-end) test suite for NuGet.MSSigning.Extensions.</Description>
+    <TestProjectType Condition="'$(IsXPlat)' != 'true'">Unit</TestProjectType>
   </PropertyGroup>
 
   <ItemGroup>
@@ -10,6 +11,8 @@
     <ProjectReference Include="..\..\TestUtilities\Test.Utility\Test.Utility.csproj" />
 
     <Reference Include="System.IO.Compression" />
+
+    <PackageReference Include="Microsoft.Build.Framework" />
   </ItemGroup>
 
   <Target Name="CopyFinalNuGetExeToOutputPath"

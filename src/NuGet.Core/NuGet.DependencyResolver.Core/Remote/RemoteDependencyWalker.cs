@@ -8,7 +8,6 @@ using System.Diagnostics;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using NuGet.Common;
 using NuGet.Frameworks;
 using NuGet.LibraryModel;
 using NuGet.Packaging;
@@ -253,12 +252,14 @@ namespace NuGet.DependencyResolver
 
         public static bool EvaluateRuntimeDependencies(ref LibraryRange libraryRange, string runtimeName, RuntimeGraph runtimeGraph, ref HashSet<LibraryDependency> runtimeDependencies)
         {
+            bool changedLibraryRange = false;
+
             // HACK(davidfowl): This is making runtime.json support package redirects
 
             // Look up any additional dependencies for this package
             foreach (var runtimeDependency in runtimeGraph.FindRuntimeDependencies(runtimeName, libraryRange.Name).NoAllocEnumerate())
             {
-                var libraryDependency = new LibraryDependency(noWarn: Array.Empty<NuGetLogCode>())
+                var libraryDependency = new LibraryDependency()
                 {
                     LibraryRange = new LibraryRange()
                     {
@@ -276,7 +277,7 @@ namespace NuGet.DependencyResolver
                     {
                         libraryRange = libraryDependency.LibraryRange;
 
-                        return true;
+                        changedLibraryRange = true;
                     }
                 }
                 else
@@ -287,7 +288,7 @@ namespace NuGet.DependencyResolver
                 }
             }
 
-            return false;
+            return changedLibraryRange;
         }
 
         public static void MergeRuntimeDependencies(HashSet<LibraryDependency> runtimeDependencies, GraphNode<RemoteResolveResult> node)
@@ -406,6 +407,8 @@ namespace NuGet.DependencyResolver
 
         // Verifies if minimum version specification for nearVersion is greater than the
         // minimum version specification for farVersion
+        // Floating ranges are considered greater than the equivalent non-floating ranges.
+        // When floating ranges are compared, the shorter one is considered greater, since it matches more.
         public static bool IsGreaterThanOrEqualTo(VersionRange nearVersion, VersionRange farVersion)
         {
             if (!nearVersion.HasLowerBound)
@@ -478,9 +481,36 @@ namespace NuGet.DependencyResolver
                 {
                     var lengthToCompare = Math.Min(nearRelease.Length, farRelease.Length);
 
-                    return StringComparer.OrdinalIgnoreCase.Compare(
+                    int compareResult = StringComparer.OrdinalIgnoreCase.Compare(
                         nearRelease.Substring(0, lengthToCompare),
-                        farRelease.Substring(0, lengthToCompare)) >= 0;
+                        farRelease.Substring(0, lengthToCompare));
+
+                    if (compareResult > 0)
+                    {
+                        return true;
+                    }
+                    else if (compareResult == 0)
+                    {
+                        // When 2 ranges are equivalent, but one is floating and the other is not, the floating one is greater.
+                        if (nearVersion.IsFloating && !farVersion.IsFloating)
+                        {
+                            return true;
+                        }
+                        // When 2 ranges are equivalent, but one is floating and the other is not, the floating one is greater.
+                        if (!nearVersion.IsFloating && farVersion.IsFloating)
+                        {
+                            return false;
+                        }
+                        // When ranges are equivalent in everything but release label length, the shorter is considered greater.
+                        // When comparing versions, the longer one is considered newer, but with 2 floating ranges,
+                        // the shorter one will match everything the longer one does.
+                        // If there's no version satisfying the longer range, then the operation will fail at a later point.
+                        return nearRelease.Length <= farRelease.Length;
+                    }
+                    else
+                    {
+                        return false;
+                    }
                 }
             }
 
@@ -489,25 +519,29 @@ namespace NuGet.DependencyResolver
 
         private static NuGetVersion GetReleaseLabelFreeVersion(VersionRange versionRange)
         {
-            if (versionRange.Float.FloatBehavior == NuGetVersionFloatBehavior.Major)
+            if (versionRange.Float.FloatBehavior == NuGetVersionFloatBehavior.Major || versionRange.Float.FloatBehavior == NuGetVersionFloatBehavior.PrereleaseMajor)
             {
                 return new NuGetVersion(int.MaxValue, int.MaxValue, int.MaxValue);
             }
-            else if (versionRange.Float.FloatBehavior == NuGetVersionFloatBehavior.Minor)
+            else if (versionRange.Float.FloatBehavior == NuGetVersionFloatBehavior.Minor || versionRange.Float.FloatBehavior == NuGetVersionFloatBehavior.PrereleaseMinor)
             {
                 return new NuGetVersion(versionRange.MinVersion.Major, int.MaxValue, int.MaxValue, int.MaxValue);
             }
-            else if (versionRange.Float.FloatBehavior == NuGetVersionFloatBehavior.Patch)
+            else if (versionRange.Float.FloatBehavior == NuGetVersionFloatBehavior.Patch || versionRange.Float.FloatBehavior == NuGetVersionFloatBehavior.PrereleasePatch)
             {
                 return new NuGetVersion(versionRange.MinVersion.Major, versionRange.MinVersion.Minor, int.MaxValue, int.MaxValue);
             }
-            else if (versionRange.Float.FloatBehavior == NuGetVersionFloatBehavior.Revision)
+            else if (versionRange.Float.FloatBehavior == NuGetVersionFloatBehavior.Revision || versionRange.Float.FloatBehavior == NuGetVersionFloatBehavior.PrereleaseRevision)
             {
                 return new NuGetVersion(
                     versionRange.MinVersion.Major,
                     versionRange.MinVersion.Minor,
                     versionRange.MinVersion.Patch,
                     int.MaxValue);
+            }
+            else if (versionRange.Float.FloatBehavior == NuGetVersionFloatBehavior.AbsoluteLatest)
+            {
+                return new NuGetVersion(int.MaxValue, int.MaxValue, int.MaxValue, int.MaxValue);
             }
             else
             {

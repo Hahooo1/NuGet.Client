@@ -22,7 +22,7 @@ namespace NuGet.Frameworks
         {
             Framework = framework ?? throw new ArgumentNullException(nameof(framework));
             RuntimeIdentifier = runtimeIdentifier ?? string.Empty;
-            Name = GetName(framework, runtimeIdentifier);
+            Name = GetTargetGraphName(framework, runtimeIdentifier);
         }
 
         public bool Equals(FrameworkRuntimePair? other)
@@ -51,12 +51,6 @@ namespace NuGet.Frameworks
                 RuntimeIdentifier);
         }
 
-        [Obsolete("This type is immutable, so there is no need or point to clone it.")]
-        public FrameworkRuntimePair Clone()
-        {
-            return this;
-        }
-
         public int CompareTo(FrameworkRuntimePair? other)
         {
             if (other == null) return 1;
@@ -67,24 +61,6 @@ namespace NuGet.Frameworks
                 return fxCompare;
             }
             return string.Compare(RuntimeIdentifier, other.RuntimeIdentifier, StringComparison.Ordinal);
-        }
-
-        public static string GetName(NuGetFramework framework, string? runtimeIdentifier)
-        {
-            if (framework is null) throw new ArgumentNullException(nameof(framework));
-
-            if (string.IsNullOrEmpty(runtimeIdentifier))
-            {
-                return framework.ToString();
-            }
-            else
-            {
-                return string.Format(
-                    CultureInfo.CurrentCulture,
-                    "{0} ({1})",
-                    framework,
-                    runtimeIdentifier);
-            }
         }
 
         public static string GetTargetGraphName(NuGetFramework framework, string? runtimeIdentifier)

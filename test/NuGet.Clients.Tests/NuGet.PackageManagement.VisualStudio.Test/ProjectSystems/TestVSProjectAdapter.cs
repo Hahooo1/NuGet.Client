@@ -12,7 +12,6 @@ using Microsoft.VisualStudio.Shell.Interop;
 using Moq;
 using NuGet.Frameworks;
 using NuGet.ProjectManagement;
-using NuGet.RuntimeModel;
 using NuGet.VisualStudio;
 
 namespace NuGet.PackageManagement.VisualStudio.Test
@@ -26,7 +25,7 @@ namespace NuGet.PackageManagement.VisualStudio.Test
         private readonly bool _isCPVMEnabled;
         private readonly IEnumerable<(string PackageId, string Version)> _projectPackageVersions;
         private readonly string _isCentralPackageVersionOverrideEnabled;
-        private readonly string _CentralPackageTransitivePinningEnabled;
+        private readonly string _isCentralPackageTransitivePinningEnabled;
 
         public TestVSProjectAdapter(
             string fullProjectPath,
@@ -49,7 +48,7 @@ namespace NuGet.PackageManagement.VisualStudio.Test
             _isCPVMEnabled = projectPackageVersions?.Any() == true;
             _projectPackageVersions = projectPackageVersions;
             _isCentralPackageVersionOverrideEnabled = isCentralPackageVersionOverrideEnabled;
-            _CentralPackageTransitivePinningEnabled = CentralPackageTransitivePinningEnabled;
+            _isCentralPackageTransitivePinningEnabled = CentralPackageTransitivePinningEnabled;
 
 #pragma warning disable CS0618 // Type or member is obsolete
             Mock.Get(BuildProperties)
@@ -62,7 +61,7 @@ namespace NuGet.PackageManagement.VisualStudio.Test
 
             Mock.Get(BuildProperties)
                 .Setup(x => x.GetPropertyValueWithDteFallback(It.Is<string>(x => x.Equals(ProjectBuildProperties.CentralPackageTransitivePinningEnabled))))
-                .Returns(_CentralPackageTransitivePinningEnabled ?? string.Empty);
+                .Returns(_isCentralPackageTransitivePinningEnabled ?? string.Empty);
 
             Mock.Get(BuildProperties)
                 .Setup(x => x.GetPropertyValueWithDteFallback(It.Is<string>(x => x.Equals(ProjectBuildProperties.NuGetLockFilePath))))
@@ -136,16 +135,6 @@ namespace NuGet.PackageManagement.VisualStudio.Test
         public Task<IEnumerable<string>> GetReferencedProjectsAsync()
         {
             return Task.FromResult(Enumerable.Empty<string>());
-        }
-
-        public Task<IEnumerable<RuntimeDescription>> GetRuntimeIdentifiersAsync()
-        {
-            return Task.FromResult(Enumerable.Empty<RuntimeDescription>());
-        }
-
-        public Task<IEnumerable<CompatibilityProfile>> GetRuntimeSupportsAsync()
-        {
-            return Task.FromResult(Enumerable.Empty<CompatibilityProfile>());
         }
 
         public NuGetFramework GetTargetFramework()

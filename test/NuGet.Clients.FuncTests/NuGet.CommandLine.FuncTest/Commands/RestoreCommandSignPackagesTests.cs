@@ -10,6 +10,8 @@ using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using System.Threading.Tasks;
 using FluentAssertions;
+using Microsoft.Internal.NuGet.Testing.SignedPackages;
+using Microsoft.Internal.NuGet.Testing.SignedPackages.ChildProcess;
 using NuGet.Common;
 using NuGet.Frameworks;
 using NuGet.Packaging.Signing;
@@ -35,16 +37,17 @@ namespace NuGet.CommandLine.FuncTest.Commands
         private static readonly string NU3005CompressedMessage = "The package signature file entry is invalid. The central directory header field 'compression method' has an invalid value (8).";
         private static readonly string NU3005 = "NU3005: {0}";
 
-        private SignCommandTestFixture _testFixture;
+        private readonly SignCommandTestFixture _testFixture;
         private readonly ITestOutputHelper _testOutputHelper;
-        private TrustedTestCert<TestCertificate> _trustedTestCert;
+        private readonly TrustedTestCert<TestCertificate> _trustedTestCert;
         private readonly string _nugetExePath;
 
         public RestoreCommandSignPackagesTests(SignCommandTestFixture fixture, ITestOutputHelper testOutputHelper)
         {
             _testFixture = fixture ?? throw new ArgumentNullException(nameof(fixture));
             _testOutputHelper = testOutputHelper;
-            _trustedTestCert = SigningTestUtility.GenerateTrustedTestCertificate();
+            // Do not dispose this.  The fixture will dispose it.
+            _trustedTestCert = fixture.TrustedTestCertificate;
             _nugetExePath = _testFixture.NuGetExePath;
         }
 
@@ -74,7 +77,7 @@ namespace NuGet.CommandLine.FuncTest.Commands
 
                 projectA.AddPackageToAllFrameworks(packageX);
                 solution.Projects.Add(projectA);
-                solution.Create(pathContext.SolutionRoot);
+                solution.Create();
 
                 var packagesConfigPath = Path.Combine(Directory.GetParent(projectA.ProjectPath).FullName, "packages.config");
 
@@ -120,7 +123,7 @@ namespace NuGet.CommandLine.FuncTest.Commands
 
                 projectA.AddPackageToAllFrameworks(packageX);
                 solution.Projects.Add(projectA);
-                solution.Create(pathContext.SolutionRoot);
+                solution.Create();
 
                 var args = new string[]
                 {
@@ -193,7 +196,7 @@ namespace NuGet.CommandLine.FuncTest.Commands
 
                 projectA.AddPackageToAllFrameworks(packageX);
                 solution.Projects.Add(projectA);
-                solution.Create(pathContext.SolutionRoot);
+                solution.Create();
 
                 var args = new string[]
                 {
@@ -268,7 +271,7 @@ namespace NuGet.CommandLine.FuncTest.Commands
 
                 projectA.AddPackageToAllFrameworks(packageX);
                 solution.Projects.Add(projectA);
-                solution.Create(pathContext.SolutionRoot);
+                solution.Create();
 
                 var args = new string[]
                 {
@@ -347,7 +350,7 @@ namespace NuGet.CommandLine.FuncTest.Commands
 
                 projectA.AddPackageToAllFrameworks(packageX);
                 solution.Projects.Add(projectA);
-                solution.Create(pathContext.SolutionRoot);
+                solution.Create();
 
                 var args = new string[]
                 {

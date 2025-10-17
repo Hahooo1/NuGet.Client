@@ -1,7 +1,6 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
-#if IS_SIGNING_SUPPORTED
 using System;
 using System.Collections.Generic;
 using System.Formats.Asn1;
@@ -9,9 +8,9 @@ using System.Linq;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using FluentAssertions;
+using Microsoft.Internal.NuGet.Testing.SignedPackages;
 using NuGet.Common;
 using NuGet.Packaging.Signing;
-using Test.Utility.Signing;
 using Xunit;
 using EssCertIdV2 = NuGet.Packaging.Signing.EssCertIdV2;
 using SigningCertificateV2 = NuGet.Packaging.Signing.SigningCertificateV2;
@@ -547,4 +546,3 @@ namespace NuGet.Packaging.Test
         }
     }
 }
-#endif

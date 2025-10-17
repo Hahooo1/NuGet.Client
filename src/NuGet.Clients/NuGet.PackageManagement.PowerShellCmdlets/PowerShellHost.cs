@@ -44,14 +44,13 @@ namespace NuGetConsole.Host.PowerShell.Implementation
         private static bool PowerShellLoaded = false;
 
         private Microsoft.VisualStudio.Threading.AsyncLazy<IVsMonitorSelection> _vsMonitorSelection;
-        private IVsMonitorSelection VsMonitorSelection => ThreadHelper.JoinableTaskFactory.Run(_vsMonitorSelection.GetValueAsync);
-
 #pragma warning disable RS0030 // Do not used banned APIs
         private readonly AsyncSemaphore _initScriptsLock = new AsyncSemaphore(1);
 #pragma warning restore RS0030 // Do not used banned APIs
         private readonly string _name;
         private readonly IRestoreEvents _restoreEvents;
         private readonly IRunspaceManager _runspaceManager;
+        private readonly IEnvironmentVariableReader _environmentVariableReader;
         private readonly ISourceRepositoryProvider _sourceRepositoryProvider;
         private readonly Lazy<IVsSolutionManager> _solutionManager;
         private readonly Lazy<ISettings> _settings;
@@ -105,10 +104,11 @@ namespace NuGetConsole.Host.PowerShell.Implementation
         /// </summary>
         private SolutionRestoredEventArgs _currentRestore;
 
-        protected PowerShellHost(string name, IRestoreEvents restoreEvents, IRunspaceManager runspaceManager)
+        protected PowerShellHost(string name, IRestoreEvents restoreEvents, IRunspaceManager runspaceManager, IEnvironmentVariableReader environmentVariableReader)
         {
             _restoreEvents = restoreEvents;
             _runspaceManager = runspaceManager;
+            _environmentVariableReader = environmentVariableReader ?? throw new ArgumentNullException(nameof(environmentVariableReader));
 
             // TODO: Take these as ctor arguments
             var componentModel = NuGetUIThreadHelper.JoinableTaskFactory.Run(ServiceLocator.GetComponentModelAsync);
@@ -423,7 +423,7 @@ namespace NuGetConsole.Host.PowerShell.Implementation
                     // if there is no solution open, we set the active directory to be user profile folder
                     var targetDir = await _solutionManager.Value.IsSolutionOpenAsync() ?
                         await _solutionManager.Value.GetSolutionDirectoryAsync() :
-                        Environment.GetEnvironmentVariable("USERPROFILE");
+                        _environmentVariableReader.GetEnvironmentVariable("USERPROFILE");
 
                     Runspace.ChangePSDirectory(targetDir);
                 }
@@ -490,7 +490,7 @@ namespace NuGetConsole.Host.PowerShell.Implementation
                 var toolsPath = Path.Combine(installPath, "tools");
                 if (Directory.Exists(toolsPath))
                 {
-                    AddPathToEnvironment(toolsPath);
+                    AddPathToEnvironment(toolsPath, _environmentVariableReader);
 
                     var scriptPath = Path.Combine(toolsPath, PowerShellScripts.Init);
                     if (File.Exists(scriptPath))
@@ -525,9 +525,9 @@ namespace NuGetConsole.Host.PowerShell.Implementation
             }
         }
 
-        private static void AddPathToEnvironment(string path)
+        private static void AddPathToEnvironment(string path, IEnvironmentVariableReader environmentVariableReader)
         {
-            var currentPath = Environment.GetEnvironmentVariable("path", EnvironmentVariableTarget.Process);
+            var currentPath = environmentVariableReader.GetEnvironmentVariable("path");
 
             var currentPaths = new HashSet<string>(
                 currentPath.Split(Path.PathSeparator).Select(p => p.Trim()),
@@ -536,7 +536,9 @@ namespace NuGetConsole.Host.PowerShell.Implementation
             if (currentPaths.Add(path))
             {
                 var newPath = currentPath + Path.PathSeparator + path;
-                Environment.SetEnvironmentVariable("path", newPath, EnvironmentVariableTarget.Process);
+#pragma warning disable RS0030 // Do not use banned APIs (This add a path to the PATH environment variable just for the PowerShell console session)
+                Environment.SetEnvironmentVariable("path", newPath);
+#pragma warning restore RS0030 // Do not use banned APIs (This add a path to the PATH environment variable just for the PowerShell console session)
             }
         }
 
